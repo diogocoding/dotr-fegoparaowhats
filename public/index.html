@@ -47,32 +47,29 @@
       </div>
     </section>
 
-    <main id="listaLeads" class="lista" aria-live="polite">
-      <div class="skeleton-grid">
-        <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+    <section class="ferramentas">
+      <div class="ferramentas-tabs" role="tablist" aria-label="Ferramentas extras">
+        <button class="ferramenta-tab ativa" data-ferramenta="busca" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          Buscar qualquer lead
+        </button>
+        <button class="ferramenta-tab" data-ferramenta="teste" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/><path d="M22 3 12 13M22 3h-6M22 3v6"/></svg>
+          Envio de teste
+        </button>
       </div>
-    </main>
 
-    <section class="busca-lead-painel">
-      <h2 class="busca-lead-titulo">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        Buscar qualquer lead no Kommo
-      </h2>
-      <p class="busca-lead-descricao">Busca direta no Kommo por nome ou telefone — encontra o lead mesmo que ele não esteja "parado" o suficiente pra aparecer na lista de reaquecimento acima (útil pra achar seu próprio número, por exemplo).</p>
-      <div class="search busca-lead-input">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <input id="buscaLeadGlobal" type="text" placeholder="Nome ou telefone…" autocomplete="off">
+      <div id="painelBusca" class="ferramenta-corpo">
+        <p class="ferramenta-descricao">Busca direta no Kommo por nome ou telefone — encontra o lead mesmo que ele não esteja "parado" o suficiente pra aparecer na lista de reaquecimento abaixo (útil pra achar seu próprio número, por exemplo).</p>
+        <div class="search busca-lead-input">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="buscaLeadGlobal" type="text" placeholder="Nome ou telefone…" autocomplete="off">
+        </div>
+        <div id="resultadoBuscaLead" class="resultado-busca-lead"></div>
       </div>
-      <div id="resultadoBuscaLead" class="resultado-busca-lead"></div>
-    </section>
 
-    <section class="teste-painel">
-      <button id="btnAbrirTeste" class="btn-teste-toggle" type="button" aria-expanded="false">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/><path d="M22 3 12 13M22 3h-6M22 3v6"/></svg>
-        Envio de teste
-      </button>
-      <div id="painelTeste" class="teste-corpo" hidden>
-        <p class="teste-descricao">Manda a mensagem pra qualquer número (o seu, por exemplo) sem mexer em nada no Kommo.</p>
+      <div id="painelTeste" class="ferramenta-corpo" hidden>
+        <p class="ferramenta-descricao">Manda a mensagem pra qualquer número (o seu, por exemplo) sem mexer em nada no Kommo.</p>
         <div class="teste-linha">
           <label>Nome (usado no [NOME])<input id="testeNome" type="text" placeholder="Ex: Diogo"></label>
           <label>Número (com DDI+DDD)<input id="testeTelefone" type="text" placeholder="Ex: 5581999999999"></label>
@@ -83,6 +80,12 @@
         <button id="btnEnviarTeste" class="btn-enviar" type="button">Enviar teste no WhatsApp</button>
       </div>
     </section>
+
+    <main id="listaLeads" class="lista" aria-live="polite">
+      <div class="skeleton-grid">
+        <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+      </div>
+    </main>
 
   </div>
 
