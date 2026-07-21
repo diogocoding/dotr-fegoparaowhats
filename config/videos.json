@@ -3,21 +3,21 @@
     "key": "ad1-protecao-caixa",
     "etapa_alvo": "CONTATO INICIADO",
     "titulo": "Autoridade: Proteção de Caixa",
-    "driveFileId": "COLE_AQUI_O_LINK_OU_ID_DO_DRIVE_1",
+    "driveFileId": "https://drive.google.com/file/d/1SZCsQKlkGRJcPYTTDVZC-Exo_ir-O196/view?usp=drive_link",
     "mensagem": "Oi [NOME], tudo bem? Dr. Robson pediu para eu te enviar esse vídeo que explica como protegemos o caixa da empresa durante a negociação bancária. Veja se faz sentido:"
   },
   {
     "key": "ad2-resgate-no-show",
     "etapa_alvo": "NO SHOW",
     "titulo": "Resgate: O que você perde ao não vir",
-    "driveFileId": "COLE_AQUI_O_LINK_OU_ID_DO_DRIVE_2",
+    "driveFileId": "https://drive.google.com/file/d/1zI0u7AivE9Isl8Jm-b-_5rPMolDND4EW/view?usp=drive_link",
     "mensagem": "Olá [NOME], notei que não conseguimos falar na reunião. Separei esse vídeo com um resultado real que tivemos essa semana para você ver o que é possível fazer no seu caso:"
   },
   {
     "key": "ad3-prova-social",
     "etapa_alvo": "PROTOCOLO FARMER",
     "titulo": "Fechamento: Prova Social",
-    "driveFileId": "COLE_AQUI_O_LINK_OU_ID_DO_DRIVE_3",
+    "driveFileId": "https://drive.google.com/file/d/1U_9yYYG-Jv3A5J2PdP-JAnvaVpGZnZna/view?usp=drive_link",
     "mensagem": "Fala [NOME], tudo bem? Estava conversando com o Dr. Robson sobre sua proposta e ele me lembrou deste caso aqui, muito parecido com o seu. Dá uma olhada no resultado:"
   }
 ]
