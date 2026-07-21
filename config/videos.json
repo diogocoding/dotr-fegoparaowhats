@@ -1,0 +1,20 @@
+[
+  {
+    "etapa_alvo": "CONTATO INICIADO",
+    "titulo_video": "Autoridade: Proteção de Caixa",
+    "link_youtube": "https://youtu.be/ID_DO_VIDEO_1",
+    "mensagem": "Oi [NOME], tudo bem? Dr. Robson pediu para eu te enviar esse vídeo que explica como protegemos o caixa da empresa durante a negociação bancária. Veja se faz sentido:"
+  },
+  {
+    "etapa_alvo": "NO SHOW",
+    "titulo_video": "Resgate: O que você perde ao não vir",
+    "link_youtube": "https://youtu.be/ID_DO_VIDEO_2",
+    "mensagem": "Olá [NOME], notei que não conseguimos falar na reunião. Separei esse vídeo com um resultado real que tivemos essa semana para você ver o que é possível fazer no seu caso:"
+  },
+  {
+    "etapa_alvo": "PROTOCOLO FARMER",
+    "titulo_video": "Fechamento: Prova Social",
+    "link_youtube": "https://youtu.be/ID_DO_VIDEO_3",
+    "mensagem": "Fala [NOME], tudo bem? Estava conversando com o Dr. Robson sobre sua proposta e ele me lembrou deste caso aqui, muito parecido com o seu. Dá uma olhada no resultado:"
+  }
+]
