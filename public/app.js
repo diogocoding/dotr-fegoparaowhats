@@ -6,7 +6,7 @@ async function carregarLeadsParaReaquecer() {
     const listaContainer = document.getElementById('listaLeads');
     
     try {
-        const response = await fetch(`${API_URL}/api/leads-reaquecer`);
+        const response = await fetch(`${API_URL}/api/leads-para-reaquecer`);
         const leads = await response.json();
 
         if (!leads || leads.length === 0) {
