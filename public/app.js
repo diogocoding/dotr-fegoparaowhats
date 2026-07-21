@@ -5,6 +5,8 @@ const API_URL = "https://dotr-fegoparaowhats.onrender.com";
 let TODOS_OS_LEADS = [];
 let ETAPA_ATIVA = "TODAS";
 let TERMO_BUSCA = "";
+let IDS_JA_VISTOS = null; // null = ainda não fez a primeira carga
+const INTERVALO_VERIFICACAO_MS = 3 * 60 * 1000; // confere novos leads a cada 3 min
 
 const el = {
   lista: () => document.getElementById("listaLeads"),
@@ -12,6 +14,7 @@ const el = {
   tabs: () => document.getElementById("tabsEtapas"),
   busca: () => document.getElementById("busca"),
   btnAtualizar: () => document.getElementById("btnAtualizar"),
+  btnAvisos: () => document.getElementById("btnAvisos"),
   toast: () => document.getElementById("toast"),
 };
 
@@ -22,13 +25,15 @@ function mostrarToast(mensagem, tipo = "ok") {
   setTimeout(() => (t.className = "toast"), 2600);
 }
 
-async function carregarLeadsParaReaquecer({ manterFiltro = true } = {}) {
+async function carregarLeadsParaReaquecer({ manterFiltro = true, silencioso = false } = {}) {
   const btn = el.btnAtualizar();
-  btn?.classList.add("spinning");
-  el.lista().innerHTML = `
-    <div class="skeleton-grid">
-      <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
-    </div>`;
+  if (!silencioso) {
+    btn?.classList.add("spinning");
+    el.lista().innerHTML = `
+      <div class="skeleton-grid">
+        <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+      </div>`;
+  }
 
   try {
     const response = await fetch(`${API_URL}/api/leads-para-reaquecer`);
@@ -40,11 +45,13 @@ async function carregarLeadsParaReaquecer({ manterFiltro = true } = {}) {
       TERMO_BUSCA = "";
     }
 
+    avisarSeTiverLeadNovo(TODOS_OS_LEADS);
     renderizarStats();
     renderizarTabs();
     renderizarLista();
   } catch (error) {
     console.error("Erro detalhado:", error);
+    if (silencioso) return; // não estraga o que já está na tela por causa de um poll em segundo plano
     el.stats().innerHTML = "";
     el.tabs().innerHTML = "";
     el.lista().innerHTML = `
@@ -209,4 +216,105 @@ el.busca()?.addEventListener("input", e => {
 
 el.btnAtualizar()?.addEventListener("click", () => carregarLeadsParaReaquecer());
 
-document.addEventListener("DOMContentLoaded", () => carregarLeadsParaReaquecer());
+// ---------------------------------------------------------------------------
+// Avisos: compara os leads recebidos com os da última checagem e, se
+// aparecer gente nova (ex: alguém que acabou de completar +2 dias parado),
+// avisa por notificação do navegador (se permitido) e por toast.
+// Não envia nada sozinho — só avisa. O clique em "Enviar" continua manual.
+// ---------------------------------------------------------------------------
+function avisarSeTiverLeadNovo(leadsAtuais) {
+  const idsAtuais = new Set(leadsAtuais.map(l => String(l.id)));
+
+  if (IDS_JA_VISTOS !== null) {
+    const novos = [...idsAtuais].filter(id => !IDS_JA_VISTOS.has(id));
+    if (novos.length > 0) {
+      const texto = novos.length === 1
+        ? "1 lead novo pronto pra reaquecer"
+        : `${novos.length} leads novos prontos pra reaquecer`;
+      mostrarToast(texto, "ok");
+      if (window.Notification && Notification.permission === "granted") {
+        new Notification("SDR Reheat", { body: texto });
+      }
+    }
+  }
+
+  IDS_JA_VISTOS = idsAtuais;
+}
+
+function atualizarBotaoAvisos() {
+  const btn = el.btnAvisos();
+  if (!btn || !window.Notification) return;
+  const ativo = Notification.permission === "granted";
+  btn.classList.toggle("ativo", ativo);
+  btn.title = ativo ? "Avisos ativados" : "Ativar avisos de novos leads";
+}
+
+el.btnAvisos()?.addEventListener("click", async () => {
+  if (!window.Notification) {
+    mostrarToast("Seu navegador não aceita esse tipo de aviso", "erro");
+    return;
+  }
+  if (Notification.permission === "granted") {
+    mostrarToast("Avisos já estão ativados");
+    return;
+  }
+  const resultado = await Notification.requestPermission();
+  atualizarBotaoAvisos();
+  mostrarToast(resultado === "granted" ? "Avisos ativados" : "Permissão não concedida", resultado === "granted" ? "ok" : "erro");
+});
+
+// Confere silenciosamente em segundo plano — mantém o filtro/busca atuais
+// e não recria o skeleton de carregamento.
+setInterval(() => carregarLeadsParaReaquecer({ silencioso: true }), INTERVALO_VERIFICACAO_MS);
+
+document.addEventListener("DOMContentLoaded", () => {
+  atualizarBotaoAvisos();
+  carregarLeadsParaReaquecer();
+});
+
+// ---------------------------------------------------------------------------
+// Painel de envio de teste — manda pra um número qualquer (ex: o seu),
+// sem tocar em nada no Kommo.
+// ---------------------------------------------------------------------------
+async function carregarVideosParaTeste() {
+  const select = document.getElementById("testeVideo");
+  if (!select) return;
+  try {
+    const resp = await fetch(`${API_URL}/api/videos-config`);
+    const videos = await resp.json();
+    select.innerHTML = videos
+      .map(v => `<option value='${encodeURIComponent(JSON.stringify(v))}'>${escapeHtml(v.etapa_alvo)} — ${escapeHtml(v.titulo)}</option>`)
+      .join("");
+  } catch (e) {
+    select.innerHTML = `<option>Não consegui carregar os vídeos</option>`;
+  }
+}
+
+document.getElementById("btnAbrirTeste")?.addEventListener("click", () => {
+  const painel = document.getElementById("painelTeste");
+  const btn = document.getElementById("btnAbrirTeste");
+  const abrindo = painel.hidden;
+  painel.hidden = !abrindo;
+  btn.setAttribute("aria-expanded", String(abrindo));
+  if (abrindo) carregarVideosParaTeste();
+});
+
+document.getElementById("btnEnviarTeste")?.addEventListener("click", () => {
+  const nome = document.getElementById("testeNome").value.trim() || "Teste";
+  const telefone = document.getElementById("testeTelefone").value.replace(/\D/g, "");
+  const select = document.getElementById("testeVideo");
+  const video = select?.value ? JSON.parse(decodeURIComponent(select.value)) : null;
+
+  if (!telefone) {
+    mostrarToast("Informe um número pra enviar o teste", "erro");
+    return;
+  }
+  if (!video) {
+    mostrarToast("Nenhum vídeo disponível pra testar", "erro");
+    return;
+  }
+
+  const mensagem = `${video.mensagem.replace("[NOME]", nome.split(" ")[0])}\n\n${video.link}`;
+  window.open(`https://web.whatsapp.com/send?phone=${telefone}&text=${encodeURIComponent(mensagem)}`, "_blank");
+  mostrarToast("Teste aberto no WhatsApp — nada foi alterado no Kommo", "ok");
+});
