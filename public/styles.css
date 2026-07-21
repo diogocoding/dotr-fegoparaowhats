@@ -131,38 +131,24 @@ h1,h2,h3{font-family:'Space Grotesk',system-ui,sans-serif;margin:0;}
   .btn-enviar{justify-content:center;}
 }
 
-/* ---------- Painel de envio de teste ---------- */
-.teste-painel{margin-top:28px;}
-.btn-teste-toggle{
-  display:flex;align-items:center;gap:8px;width:100%;justify-content:center;
-  background:none;border:1px dashed var(--border);color:var(--text-dim);
-  padding:10px;border-radius:12px;font-size:0.8rem;font-weight:600;cursor:pointer;transition:all .15s;
+/* ---------- Painel de ferramentas (busca livre + envio de teste) ---------- */
+/* Fica logo abaixo da barra de filtro/busca, acima da lista de leads — antes
+   estava no final da página, exigindo rolar por toda a lista pra achar. */
+.ferramentas{
+  margin-bottom:22px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;
 }
-.btn-teste-toggle:hover{color:var(--text);border-color:var(--flame-2);}
-.teste-corpo{
-  margin-top:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
-  padding:20px;display:flex;flex-direction:column;gap:14px;
+.ferramentas-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ferramenta-tab{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+  background:none;border:0;color:var(--text-dim);padding:13px 10px;font-size:0.82rem;font-weight:600;
+  cursor:pointer;transition:all .15s;border-bottom:2px solid transparent;
 }
-.teste-descricao{margin:0;font-size:0.8rem;color:var(--text-dim);}
-.teste-linha{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.teste-linha label, .teste-select{
-  display:flex;flex-direction:column;gap:6px;font-size:0.72rem;color:var(--text-dim);
-  text-transform:uppercase;letter-spacing:.04em;font-weight:600;
-}
-.teste-linha input, .teste-select select{
-  background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);
-  padding:9px 11px;border-radius:9px;font-size:0.85rem;font-family:inherit;text-transform:none;letter-spacing:normal;font-weight:400;
-}
-.teste-linha input:focus, .teste-select select:focus{outline:2px solid rgba(245,166,35,0.4);border-color:transparent;}
-@media (max-width:600px){.teste-linha{grid-template-columns:1fr;}}
+.ferramenta-tab:hover{color:var(--text);}
+.ferramenta-tab.ativa{color:var(--flame-1);border-bottom-color:var(--flame-2);}
+.ferramenta-corpo{padding:18px 20px;display:flex;flex-direction:column;gap:14px;}
+.ferramenta-descricao{margin:0;font-size:0.8rem;color:var(--text-dim);}
 
-/* ---------- Busca livre de lead (Kommo) ---------- */
-.busca-lead-painel{
-  margin-top:28px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
-  padding:20px;display:flex;flex-direction:column;gap:12px;
-}
-.busca-lead-titulo{display:flex;align-items:center;gap:8px;font-size:0.95rem;color:#f5f7f8;}
-.busca-lead-descricao{margin:0;font-size:0.8rem;color:var(--text-dim);}
 .busca-lead-input{width:100%;}
 .busca-lead-input input{width:100%;}
 .resultado-busca-lead{display:flex;flex-direction:column;gap:10px;}
@@ -177,6 +163,21 @@ h1,h2,h3{font-family:'Space Grotesk',system-ui,sans-serif;margin:0;}
 @media (max-width:600px){
   .lead-acao-busca{flex-direction:column;align-items:stretch;}
   .select-video-busca{max-width:none;}
+}
+
+.teste-linha{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.teste-linha label, .teste-select{
+  display:flex;flex-direction:column;gap:6px;font-size:0.72rem;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:.04em;font-weight:600;
+}
+.teste-linha input, .teste-select select{
+  background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);
+  padding:9px 11px;border-radius:9px;font-size:0.85rem;font-family:inherit;text-transform:none;letter-spacing:normal;font-weight:400;
+}
+.teste-linha input:focus, .teste-select select:focus{outline:2px solid rgba(245,166,35,0.4);border-color:transparent;}
+@media (max-width:600px){
+  .teste-linha{grid-template-columns:1fr;}
+  .ferramenta-tab{font-size:0.75rem;padding:11px 6px;}
 }
 
 .topbar-acoes{display:flex;gap:8px;}
