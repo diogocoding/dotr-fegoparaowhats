@@ -123,12 +123,16 @@ async function buscarTodosOsLeads() {
 }
 
 // ---------------------------------------------------------------------------
-// Busca telefones de vários contatos de uma vez (em lotes de 250 ids)
+// Busca telefone E nome de vários contatos de uma vez (em lotes de 250 ids).
+// IMPORTANTE: o nome do CONTATO é o nome da pessoa de verdade. O nome do LEAD
+// (l.name lá em cima) é o título do negócio no Kommo e costuma vir genérico
+// ("Lead", "Negócio #1234" etc.) — por isso o [NOME] das mensagens usa o nome
+// do contato, não o do lead.
 // ---------------------------------------------------------------------------
-async function buscarTelefonesPorContato(idsContatos) {
-    const telefonePorContato = new Map();
+async function buscarDadosContatos(idsContatos) {
+    const dadosPorContato = new Map(); // contactId -> { telefone, nome }
     const ids = [...new Set(idsContatos)].filter(Boolean);
-    if (ids.length === 0) return telefonePorContato;
+    if (ids.length === 0) return dadosPorContato;
 
     const TAMANHO_LOTE = 250;
     for (let i = 0; i < ids.length; i += TAMANHO_LOTE) {
@@ -144,14 +148,14 @@ async function buscarTelefonesPorContato(idsContatos) {
                     f => f.field_code === "PHONE" || /telefone|phone/i.test(f.field_name || "")
                 );
                 const telefone = campoTelefone?.values?.[0]?.value;
-                if (telefone) telefonePorContato.set(c.id, telefone);
+                dadosPorContato.set(c.id, { telefone: telefone || null, nome: c.name || null });
             }
         } catch (e) {
             console.error("Erro ao buscar contatos:", e.message);
         }
     }
 
-    return telefonePorContato;
+    return dadosPorContato;
 }
 
 // ---------------------------------------------------------------------------
@@ -179,18 +183,21 @@ app.get("/api/leads-para-reaquecer", async (req, res) => {
         });
 
         const idsContatos = candidatos.flatMap(l => (l._embedded?.contacts || []).map(c => c.id));
-        const telefonePorContato = await buscarTelefonesPorContato(idsContatos);
+        const dadosPorContato = await buscarDadosContatos(idsContatos);
 
         const reaqueciveis = candidatos.map(l => {
             const nomeEtapa = mapaEtapas.get(String(l.status_id));
             const video = escolherVideo(etapasComVideo.get(normalizar(nomeEtapa)), l.id);
             const contatoId = l._embedded?.contacts?.[0]?.id;
-            const telefone = contatoId ? telefonePorContato.get(contatoId) : null;
+            const dadosContato = contatoId ? dadosPorContato.get(contatoId) : null;
+            const telefone = dadosContato?.telefone;
             const diasParado = Math.floor((agora - l.updated_at) / 86400);
 
             return {
                 id: l.id,
-                name: l.name || "Sem nome",
+                // Nome do CONTATO (a pessoa de verdade), com fallback pro nome do
+                // lead só se o contato não tiver nome cadastrado.
+                name: dadosContato?.nome || l.name || "Sem nome",
                 etapa: nomeEtapa,
                 dias_parado: diasParado,
                 telefone: telefone || null,
@@ -307,14 +314,15 @@ app.get("/api/buscar-lead", async (req, res) => {
         const mapaEtapas = await getMapaEtapas();
 
         const idsContatos = leads.flatMap(l => (l._embedded?.contacts || []).map(c => c.id));
-        const telefonePorContato = await buscarTelefonesPorContato(idsContatos);
+        const dadosPorContato = await buscarDadosContatos(idsContatos);
 
         const resultado = leads.map(l => {
             const contatoId = l._embedded?.contacts?.[0]?.id;
-            const telefone = contatoId ? telefonePorContato.get(contatoId) : null;
+            const dadosContato = contatoId ? dadosPorContato.get(contatoId) : null;
+            const telefone = dadosContato?.telefone;
             return {
                 id: l.id,
-                name: l.name || "Sem nome",
+                name: dadosContato?.nome || l.name || "Sem nome",
                 etapa: mapaEtapas.get(String(l.status_id)) || null,
                 telefone: telefone || null,
                 ja_reaquecido: l._embedded?.tags?.some(t => t.name === TAG_CONTROLE) || false,
