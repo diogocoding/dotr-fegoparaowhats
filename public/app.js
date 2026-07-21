@@ -297,13 +297,17 @@ async function carregarVideosParaTeste() {
   }
 }
 
-document.getElementById("btnAbrirTeste")?.addEventListener("click", () => {
-  const painel = document.getElementById("painelTeste");
-  const btn = document.getElementById("btnAbrirTeste");
-  const abrindo = painel.hidden;
-  painel.hidden = !abrindo;
-  btn.setAttribute("aria-expanded", String(abrindo));
-  if (abrindo) carregarVideosParaTeste();
+document.querySelectorAll(".ferramenta-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".ferramenta-tab").forEach(t => t.classList.remove("ativa"));
+    tab.classList.add("ativa");
+
+    const alvo = tab.dataset.ferramenta; // "busca" ou "teste"
+    document.getElementById("painelBusca").hidden = alvo !== "busca";
+    document.getElementById("painelTeste").hidden = alvo !== "teste";
+
+    if (alvo === "teste") carregarVideosParaTeste();
+  });
 });
 
 document.getElementById("btnEnviarTeste")?.addEventListener("click", () => {
