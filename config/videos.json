@@ -2,6 +2,7 @@
   {
     "key": "ad1-divida-100k",
     "etapa_alvo": "CONTATO INICIADO",
+    "dias_minimos": 3,
     "titulo": "CP: Tenho dívida de mais de 100K",
     "driveFileId": "https://drive.google.com/file/d/1SZCsQKlkGRJcPYTTDVZC-Exo_ir-O196/view?usp=drive_link",
     "mensagem": "Oi [NOME], tudo bem? Dr. Robson pediu para eu te enviar esse vídeo que explica como protegemos o caixa da empresa durante a negociação bancária. Veja se faz sentido:"
@@ -9,6 +10,7 @@
   {
     "key": "ad3-empresario-paulista-500k",
     "etapa_alvo": "CONTATO INICIADO",
+    "dias_minimos": 3,
     "titulo": "Sou empresário paulista e devo mais de 500K",
     "driveFileId": "https://drive.google.com/file/d/1zI0u7AivE9Isl8Jm-b-_5rPMolDND4EW/view?usp=drive_link",
     "mensagem": "Oi [NOME], tudo bem? Separei esse vídeo de um caso parecido com o seu, de um empresário que também estava endividado. Veja se faz sentido:"
@@ -16,6 +18,7 @@
   {
     "key": "ad4-motivos-especialista",
     "etapa_alvo": "CONTATO INICIADO",
+    "dias_minimos": 3,
     "titulo": "4 motivos para procurar um especialista",
     "driveFileId": "https://drive.google.com/file/d/1U_9yYYG-Jv3A5J2PdP-JAnvaVpGZnZna/view?usp=drive_link",
     "mensagem": "Oi [NOME], tudo bem? Dr. Robson pediu para eu te mandar esse vídeo, explicando por que faz diferença ter um especialista cuidando da sua negociação bancária:"
@@ -23,13 +26,31 @@
   {
     "key": "ad7-divida-500k-bens-penhorados",
     "etapa_alvo": "CONTATO INICIADO",
+    "dias_minimos": 3,
     "titulo": "CP: Tenho dívida de 500K, posso ter bens penhorados?",
     "driveFileId": "https://drive.google.com/file/d/1g5LOqc40uFRX5avTQt4BnbN8HQuftNt-/view?usp=drive_link",
     "mensagem": "Oi [NOME], tudo bem? Vi que sua situação pode ser parecida com a deste vídeo, sobre risco de penhora de bens. Dá uma olhada:"
   },
   {
+    "key": "ad4-qualificacao-especialista",
+    "etapa_alvo": "QUALIFICAÇÃO",
+    "dias_minimos": 3,
+    "titulo": "4 motivos para procurar um especialista",
+    "driveFileId": "https://drive.google.com/file/d/1U_9yYYG-Jv3A5J2PdP-JAnvaVpGZnZna/view?usp=drive_link",
+    "mensagem": "Oi [NOME], tudo bem? Enquanto seguimos analisando o seu caso, separei esse vídeo que explica por que faz diferença ter um especialista cuidando da negociação. Dá uma olhada:"
+  },
+  {
+    "key": "ad16-qualificacao-origem-debito",
+    "etapa_alvo": "QUALIFICAÇÃO",
+    "dias_minimos": 3,
+    "titulo": "A gente investiga primeiro a origem do débito",
+    "driveFileId": "https://drive.google.com/file/d/1gE9J0P4aKfw9pN5CexHqtdVOiaMy22wO/view?usp=drive_link",
+    "mensagem": "Oi [NOME], tudo bem? Separei esse vídeo explicando como funciona a primeira etapa da nossa análise no seu caso. Dá uma olhada:"
+  },
+  {
     "key": "ad16-investigamos-origem-debito",
     "etapa_alvo": "NO SHOW",
+    "dias_minimos": 3,
     "titulo": "A gente investiga primeiro a origem do débito",
     "driveFileId": "https://drive.google.com/file/d/1gE9J0P4aKfw9pN5CexHqtdVOiaMy22wO/view?usp=drive_link",
     "mensagem": "Olá [NOME], notei que não conseguimos falar na reunião. Separei esse vídeo explicando como funciona a primeira etapa da nossa análise:"
@@ -37,6 +58,7 @@
   {
     "key": "ad17-como-empresario-vai-viver",
     "etapa_alvo": "NO SHOW",
+    "dias_minimos": 3,
     "titulo": "Como é que esse empresário vai viver?",
     "driveFileId": "https://drive.google.com/file/d/1BynyCUA1Ngdnlf7U_PQOI4beUCNAl_GU/view?usp=drive_link",
     "mensagem": "Olá [NOME], notei que não conseguimos falar na reunião. Separei esse vídeo com um caso real que mostra o que está em jogo quando isso não é resolvido:"
@@ -44,6 +66,7 @@
   {
     "key": "ad19-caso-empresario-1m",
     "etapa_alvo": "PROTOCOLO FARMER",
+    "dias_minimos": 3,
     "titulo": "Já pegamos caso do empresário devendo 1M",
     "driveFileId": "https://drive.google.com/file/d/1pwVPcGmMG8ITpaFQvVRcfAnoNY91iOGC/view?usp=drive_link",
     "mensagem": "Fala [NOME], tudo bem? Estava conversando com o Dr. Robson sobre sua proposta e ele me lembrou deste caso aqui, muito parecido com o seu. Dá uma olhada no resultado:"
@@ -51,6 +74,7 @@
   {
     "key": "ad22-bb-renegociou-desenrola",
     "etapa_alvo": "PROTOCOLO FARMER",
+    "dias_minimos": 3,
     "titulo": "BB renegociou 11,4 bi no Desenrola",
     "driveFileId": "https://drive.google.com/file/d/16eUD-NNt-ErAY85L9jGGCzCC7Vcadj_a/view?usp=drive_link",
     "mensagem": "Fala [NOME], tudo bem? Vi essa notícia sobre renegociação em massa de dívida bancária e lembrei do seu caso. Dá uma olhada:"
@@ -58,8 +82,25 @@
   {
     "key": "ad5-acordo-90",
     "etapa_alvo": "PROTOCOLO FARMER",
+    "dias_minimos": 3,
     "titulo": "A gente consegue acordo de 90%",
     "driveFileId": "https://drive.google.com/file/d/1SyGqt_MX4m-cTyWvKVLgZh5Uv5ilu7qO/view?usp=drive_link",
     "mensagem": "Fala [NOME], tudo bem? Separei esse vídeo mostrando o tipo de acordo que costumamos conseguir em casos como o seu. Dá uma olhada:"
+  },
+  {
+    "key": "ad17-frio-como-vai-viver",
+    "etapa_alvo": "CLIENTE FRIO",
+    "dias_minimos": 3,
+    "titulo": "Como é que esse empresário vai viver?",
+    "driveFileId": "https://drive.google.com/file/d/1BynyCUA1Ngdnlf7U_PQOI4beUCNAl_GU/view?usp=drive_link",
+    "mensagem": "Oi [NOME], tudo bem? Faz um tempo que a gente não troca uma ideia. Separei esse vídeo com um caso real que mostra o que está em jogo quando uma dívida como a sua fica parada. Dá uma olhada:"
+  },
+  {
+    "key": "ad22-frio-bb-desenrola",
+    "etapa_alvo": "CLIENTE FRIO",
+    "dias_minimos": 3,
+    "titulo": "BB renegociou 11,4 bi no Desenrola",
+    "driveFileId": "https://drive.google.com/file/d/16eUD-NNt-ErAY85L9jGGCzCC7Vcadj_a/view?usp=drive_link",
+    "mensagem": "Oi [NOME], tudo bem? Vi essa notícia sobre renegociação em massa de dívida bancária e lembrei do seu caso. Ainda faz sentido a gente retomar a conversa? Dá uma olhada:"
   }
 ]
