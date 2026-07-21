@@ -67,6 +67,39 @@ function normalizar(texto) {
     return String(texto || "").trim().toUpperCase();
 }
 
+// Agrupa os vídeos configurados por etapa (uma etapa pode ter vários vídeos).
+function agruparVideosPorEtapa(videosConfig) {
+    const mapa = new Map();
+    for (const v of videosConfig) {
+        const chave = normalizar(v.etapa_alvo);
+        if (!mapa.has(chave)) mapa.set(chave, []);
+        mapa.get(chave).push(v);
+    }
+    return mapa;
+}
+
+// Escolhe um vídeo entre os disponíveis para a etapa de forma determinística
+// por lead (mesmo lead sempre recebe a mesma sugestão se a lista for
+// recarregada), mas distribuída entre os vários vídeos daquela etapa.
+function escolherVideo(videosDaEtapa, leadId) {
+    if (videosDaEtapa.length === 1) return videosDaEtapa[0];
+    let hash = 0;
+    for (const c of String(leadId)) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
+    return videosDaEtapa[hash % videosDaEtapa.length];
+}
+
+// Cada etapa pode ter seu próprio número mínimo de dias parado — basta
+// colocar "dias_minimos" em qualquer vídeo daquela etapa no videos.json.
+// Se não for informado, usa o padrão global (DIAS_MINIMOS_PARADO).
+function getDiasMinimoPorEtapa(etapasComVideo) {
+    const mapa = new Map();
+    for (const [etapa, videos] of etapasComVideo) {
+        const comOverride = videos.find(v => typeof v.dias_minimos === "number");
+        mapa.set(etapa, comOverride ? comOverride.dias_minimos : DIAS_MINIMOS_PARADO);
+    }
+    return mapa;
+}
+
 // ---------------------------------------------------------------------------
 // Busca todos os leads paginando (a API do Kommo devolve no máximo 250 por vez)
 // ---------------------------------------------------------------------------
@@ -127,7 +160,8 @@ async function buscarTelefonesPorContato(idsContatos) {
 app.get("/api/leads-para-reaquecer", async (req, res) => {
     try {
         const videosConfig = carregarVideosConfig();
-        const etapasComVideo = new Map(videosConfig.map(v => [normalizar(v.etapa_alvo), v]));
+        const etapasComVideo = agruparVideosPorEtapa(videosConfig);
+        const diasMinimoPorEtapa = getDiasMinimoPorEtapa(etapasComVideo);
 
         const [leads, mapaEtapas] = await Promise.all([buscarTodosOsLeads(), getMapaEtapas()]);
 
@@ -138,8 +172,10 @@ app.get("/api/leads-para-reaquecer", async (req, res) => {
             const jaRecebeu = l._embedded?.tags?.some(t => t.name === TAG_CONTROLE);
             const diasParado = (agora - l.updated_at) / 86400;
             const nomeEtapa = mapaEtapas.get(String(l.status_id));
-            const temVideoParaEtapa = nomeEtapa && etapasComVideo.has(normalizar(nomeEtapa));
-            return !jaRecebeu && diasParado >= DIAS_MINIMOS_PARADO && temVideoParaEtapa;
+            const chaveEtapa = normalizar(nomeEtapa);
+            const temVideoParaEtapa = nomeEtapa && etapasComVideo.has(chaveEtapa);
+            const minimoExigido = temVideoParaEtapa ? diasMinimoPorEtapa.get(chaveEtapa) : Infinity;
+            return !jaRecebeu && diasParado >= minimoExigido && temVideoParaEtapa;
         });
 
         const idsContatos = candidatos.flatMap(l => (l._embedded?.contacts || []).map(c => c.id));
@@ -147,7 +183,7 @@ app.get("/api/leads-para-reaquecer", async (req, res) => {
 
         const reaqueciveis = candidatos.map(l => {
             const nomeEtapa = mapaEtapas.get(String(l.status_id));
-            const video = etapasComVideo.get(normalizar(nomeEtapa));
+            const video = escolherVideo(etapasComVideo.get(normalizar(nomeEtapa)), l.id);
             const contatoId = l._embedded?.contacts?.[0]?.id;
             const telefone = contatoId ? telefonePorContato.get(contatoId) : null;
             const diasParado = Math.floor((agora - l.updated_at) / 86400);
@@ -252,7 +288,66 @@ function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// ---------------------------------------------------------------------------
+// Busca livre de leads no Kommo — encontra QUALQUER lead por nome ou telefone,
+// independente da etapa ou de quantos dias está parado (não usa o filtro de
+// "pronto pra reaquecer"). Serve pra achar seu próprio número, testar, ou
+// mandar um vídeo fora do fluxo automático.
+// ---------------------------------------------------------------------------
+app.get("/api/buscar-lead", async (req, res) => {
+    try {
+        const termo = String(req.query.q || "").trim();
+        if (!termo) return res.json([]);
+
+        const resp = await axios.get(`${KOMMO_URL}/leads`, {
+            headers: HEADERS,
+            params: { with: "contacts", query: termo, limit: 50 },
+        });
+        const leads = resp.data?._embedded?.leads || [];
+        const mapaEtapas = await getMapaEtapas();
+
+        const idsContatos = leads.flatMap(l => (l._embedded?.contacts || []).map(c => c.id));
+        const telefonePorContato = await buscarTelefonesPorContato(idsContatos);
+
+        const resultado = leads.map(l => {
+            const contatoId = l._embedded?.contacts?.[0]?.id;
+            const telefone = contatoId ? telefonePorContato.get(contatoId) : null;
+            return {
+                id: l.id,
+                name: l.name || "Sem nome",
+                etapa: mapaEtapas.get(String(l.status_id)) || null,
+                telefone: telefone || null,
+                ja_reaquecido: l._embedded?.tags?.some(t => t.name === TAG_CONTROLE) || false,
+            };
+        });
+
+        res.json(resultado);
+    } catch (error) {
+        console.error("Erro em /api/buscar-lead:", error.response?.data || error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.get("/api/health", (req, res) => res.json({ ok: true }));
+
+// Lista os vídeos configurados (usado pelo painel de "Envio de teste" no
+// frontend, pra popular o seletor sem precisar repetir o videos.json ali).
+app.get("/api/videos-config", (req, res) => {
+    try {
+        const videosConfig = carregarVideosConfig();
+        res.json(
+            videosConfig.map(v => ({
+                key: v.key,
+                etapa_alvo: v.etapa_alvo,
+                titulo: v.titulo,
+                mensagem: v.mensagem,
+                link: `${PUBLIC_BASE_URL}/v/${v.key}`,
+            }))
+        );
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Rodando na porta ${PORT}`));
