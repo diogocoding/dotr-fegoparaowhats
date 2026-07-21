@@ -130,3 +130,54 @@ h1,h2,h3{font-family:'Space Grotesk',system-ui,sans-serif;margin:0;}
   .sugestao{text-align:left;}
   .btn-enviar{justify-content:center;}
 }
+
+/* ---------- Painel de envio de teste ---------- */
+.teste-painel{margin-top:28px;}
+.btn-teste-toggle{
+  display:flex;align-items:center;gap:8px;width:100%;justify-content:center;
+  background:none;border:1px dashed var(--border);color:var(--text-dim);
+  padding:10px;border-radius:12px;font-size:0.8rem;font-weight:600;cursor:pointer;transition:all .15s;
+}
+.btn-teste-toggle:hover{color:var(--text);border-color:var(--flame-2);}
+.teste-corpo{
+  margin-top:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;display:flex;flex-direction:column;gap:14px;
+}
+.teste-descricao{margin:0;font-size:0.8rem;color:var(--text-dim);}
+.teste-linha{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.teste-linha label, .teste-select{
+  display:flex;flex-direction:column;gap:6px;font-size:0.72rem;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:.04em;font-weight:600;
+}
+.teste-linha input, .teste-select select{
+  background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);
+  padding:9px 11px;border-radius:9px;font-size:0.85rem;font-family:inherit;text-transform:none;letter-spacing:normal;font-weight:400;
+}
+.teste-linha input:focus, .teste-select select:focus{outline:2px solid rgba(245,166,35,0.4);border-color:transparent;}
+@media (max-width:600px){.teste-linha{grid-template-columns:1fr;}}
+
+/* ---------- Busca livre de lead (Kommo) ---------- */
+.busca-lead-painel{
+  margin-top:28px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;display:flex;flex-direction:column;gap:12px;
+}
+.busca-lead-titulo{display:flex;align-items:center;gap:8px;font-size:0.95rem;color:#f5f7f8;}
+.busca-lead-descricao{margin:0;font-size:0.8rem;color:var(--text-dim);}
+.busca-lead-input{width:100%;}
+.busca-lead-input input{width:100%;}
+.resultado-busca-lead{display:flex;flex-direction:column;gap:10px;}
+.busca-status{margin:4px 0;font-size:0.82rem;color:var(--text-dim);}
+.busca-status.erro{color:var(--danger);}
+.lead-card-busca{padding:14px 16px;}
+.lead-acao-busca{flex-direction:row;align-items:center;gap:8px;}
+.select-video-busca{
+  background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);
+  padding:8px 10px;border-radius:9px;font-size:0.78rem;max-width:260px;
+}
+@media (max-width:600px){
+  .lead-acao-busca{flex-direction:column;align-items:stretch;}
+  .select-video-busca{max-width:none;}
+}
+
+.topbar-acoes{display:flex;gap:8px;}
+.btn-ghost.ativo{border-color:var(--flame-2);color:var(--flame-1);}
