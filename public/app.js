@@ -1,54 +1,47 @@
-// Configuração do link do seu Back-end no Render
-const API_URL = "https://dotr-fegoparaowhats.onrender.com";
+// ATENÇÃO: Verifique se o link abaixo termina EXATAMENTE assim, sem barra no final.
+const API_URL = "https://dotr-fegoparaowhats.onrender.com"; 
 
-// Função principal que carrega os leads ao abrir a página
 async function carregarLeadsParaReaquecer() {
     const listaContainer = document.getElementById('listaLeads');
-    
+    if (!listaContainer) return;
+
     try {
+        console.log("Buscando leads em:", `${API_URL}/api/leads-para-reaquecer`);
+        
         const response = await fetch(`${API_URL}/api/leads-para-reaquecer`);
+        
+        // Se a resposta não for OK, lança erro para o catch
+        if (!response.ok) throw new Error(`Erro no servidor: ${response.status}`);
+
         const leads = await response.json();
 
         if (!leads || leads.length === 0) {
-            listaContainer.innerHTML = `
-                <div class="text-center py-20">
-                    <p class="text-slate-500">✅ Nenhum lead pendente de reaquecimento no momento.</p>
-                </div>
-            `;
+            listaContainer.innerHTML = `<p class="text-center py-20 text-slate-500">✅ Nenhum lead pendente de reaquecimento.</p>`;
             return;
         }
 
-        // Renderiza os cards dos leads
         listaContainer.innerHTML = leads.map(lead => {
-            // Se o vídeo sugerido não vier do back, usamos um padrão para não quebrar
-            const video = lead.video_sugerido || { 
-                titulo: "Vídeo Institucional", 
-                link: "https://youtu.be/default", 
-                mensagem: "Olá [NOME], veja esse conteúdo que o Dr. Robson separou para você:" 
-            };
-
+            const video = lead.video_sugerido || { titulo: "Vídeo Institucional", link: "#", copy: "Olá!" };
+            
             return `
-                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-amber-500/30 transition-all">
+                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-4 hover:border-amber-500/30 transition-all">
                     <div class="space-y-1">
                         <span class="text-[10px] font-bold bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded uppercase border border-amber-500/20">
-                            ${lead.etapa || 'Etapa não identificada'}
+                            ${lead.etapa}
                         </span>
                         <h3 class="text-lg font-bold text-slate-100">${lead.name}</h3>
-                        <p class="text-xs text-slate-500 flex items-center gap-1">
-                            <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-                            Parado há ${lead.dias_parado} dias
-                        </p>
+                        <p class="text-xs text-slate-500 italic">Parado há ${lead.dias_parado} dias</p>
                     </div>
 
                     <div class="flex flex-col items-end gap-3 w-full md:w-auto">
-                        <div class="text-right">
-                            <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Vídeo Sugerido</p>
+                        <div class="text-right hidden md:block">
+                            <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Sugestão</p>
                             <p class="text-xs text-amber-400 font-medium">${video.titulo}</p>
                         </div>
                         
                         <button onclick="enviarWhatsApp('${lead.id}', '${lead.name}', '${lead.telefone}', ${JSON.stringify(video).replace(/"/g, '&quot;')})" 
-                                class="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-black px-6 py-3 rounded-xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2">
-                            📱 ENVIAR WHATSAPP
+                                class="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-black px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2">
+                            📱 ENVIAR NO WHATSAPP
                         </button>
                     </div>
                 </div>
@@ -56,27 +49,35 @@ async function carregarLeadsParaReaquecer() {
         }).join('');
 
     } catch (error) {
-        console.error("Erro ao buscar leads:", error);
+        console.error("Erro detalhado:", error);
         listaContainer.innerHTML = `
-            <div class="bg-rose-500/10 border border-rose-500/20 p-6 rounded-xl text-rose-400 text-center">
-                <p class="font-bold">Erro de Conexão</p>
-                <p class="text-xs">Não foi possível conectar ao servidor no Render. Verifique se o Back-end está ativo.</p>
+            <div class="text-center py-10">
+                <p class="text-rose-500 font-bold">Erro de Conexão</p>
+                <p class="text-xs text-slate-500">O site não conseguiu falar com o Render.</p>
+                <p class="text-[10px] mt-2 bg-slate-900 p-2 rounded font-mono">${error.message}</p>
             </div>
         `;
     }
 }
 
-// Função que abre o WhatsApp e avisa o Back-end para tirar o lead da lista
 async function enviarWhatsApp(leadId, nome, telefone, videoConfig) {
-    // 1. Prepara a mensagem
-    // Pegamos apenas o primeiro nome para ficar mais pessoal
     const primeiroNome = nome.split(' ')[0];
-    const mensagemPronta = videoConfig.mensagem.replace('[NOME]', primeiroNome);
-    const linkFinal = `${mensagemPronta} ${videoConfig.link}`;
+    const mensagemFinal = videoConfig.copy.replace('[NOME]', primeiroNome) + "\n\n" + videoConfig.link;
+    
+    // Abre o WhatsApp (tenta usar o telefone se existir, senão vai sem número)
+    const telLimpo = (telefone && telefone !== "Ver no Kommo") ? telefone.replace(/\D/g, '') : "";
+    const urlWhats = `https://web.whatsapp.com/send?phone=${telLimpo}&text=${encodeURIComponent(mensagemFinal)}`;
+    
+    window.open(urlWhats, '_blank');
 
-    // 2. Tenta formatar o telefone (se o telefone vier do back)
-    // Se o telefone não vier, o WhatsApp abrirá para você escolher o contato
-    const numeroWhats = telefone && telefone !== "Ver no Kommo" ? telefone.replace(/\D/g, '') : "";
+    // Avisa o backend para por a tag e sumir com o lead da lista
+    try {
+        await fetch(`${API_URL}/api/marcar-enviado/${leadId}`, { method: 'POST' });
+        // Recarrega em 2 segundos para o lead sumir da tela
+        setTimeout(carregarLeadsParaReaquecer, 2000);
+    } catch (e) {
+        console.error("Erro ao marcar como enviado:", e);
+    }
+}
 
-    // 3. Abre o WhatsApp Web
-    const urlWhats = `https://web.whatsapp.com/send
+document.addEventListener('DOMContentLoaded', carregarLeadsParaReaquecer);
