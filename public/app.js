@@ -182,9 +182,7 @@ async function enviarWhatsApp(leadId, nome, telefone, videoConfig, btn) {
   const primeiroNome = (nome || "").split(" ")[0];
   const mensagemFinal = `${videoConfig.copy.replace("[NOME]", primeiroNome)}\n\n${videoConfig.link}`;
   const telLimpo = telefone ? telefone.replace(/\D/g, "") : "";
-  const urlWhats = `https://web.whatsapp.com/send?phone=${telLimpo}&text=${encodeURIComponent(mensagemFinal)}`;
-
-  window.open(urlWhats, "_blank");
+  abrirWhatsApp(telLimpo, mensagemFinal);
 
   btn.disabled = true;
   btn.textContent = "Marcando…";
@@ -207,6 +205,15 @@ async function enviarWhatsApp(leadId, nome, telefone, videoConfig, btn) {
 
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// web.whatsapp.com sempre força a versão web, mesmo com o WhatsApp Desktop
+// instalado. O link wa.me é o link universal do próprio WhatsApp: o sistema
+// operacional/navegador tenta abrir o app instalado (desktop) primeiro e só
+// cai pro WhatsApp Web se não achar nenhum app.
+function abrirWhatsApp(telefoneLimpo, mensagem) {
+  const url = `https://wa.me/${telefoneLimpo}?text=${encodeURIComponent(mensagem)}`;
+  window.open(url, "_blank");
 }
 
 el.busca()?.addEventListener("input", e => {
@@ -315,6 +322,115 @@ document.getElementById("btnEnviarTeste")?.addEventListener("click", () => {
   }
 
   const mensagem = `${video.mensagem.replace("[NOME]", nome.split(" ")[0])}\n\n${video.link}`;
-  window.open(`https://web.whatsapp.com/send?phone=${telefone}&text=${encodeURIComponent(mensagem)}`, "_blank");
+  abrirWhatsApp(telefone, mensagem);
   mostrarToast("Teste aberto no WhatsApp — nada foi alterado no Kommo", "ok");
+});
+
+// ---------------------------------------------------------------------------
+// Busca livre de lead no Kommo — encontra QUALQUER lead (o seu número
+// incluso), mesmo que não esteja "parado" o suficiente pra entrar na lista
+// de reaquecimento. Não usa o filtro de dias/etapa — é uma busca direta na
+// API do Kommo por nome ou telefone.
+// ---------------------------------------------------------------------------
+async function buscarLeadGlobal(termo) {
+  const container = document.getElementById("resultadoBuscaLead");
+  if (!container) return;
+
+  if (!termo) {
+    container.innerHTML = "";
+    return;
+  }
+
+  container.innerHTML = `<p class="busca-status">Procurando no Kommo…</p>`;
+
+  try {
+    const resp = await fetch(`${API_URL}/api/buscar-lead?q=${encodeURIComponent(termo)}`);
+    if (!resp.ok) throw new Error(`status ${resp.status}`);
+    const resultados = await resp.json();
+
+    if (resultados.length === 0) {
+      container.innerHTML = `<p class="busca-status">Nenhum lead encontrado com "${escapeHtml(termo)}".</p>`;
+      return;
+    }
+
+    container.innerHTML = resultados.map(leadBuscaParaHtml).join("");
+
+    container.querySelectorAll("[data-enviar-busca]").forEach(btn => {
+      btn.addEventListener("click", () => enviarVideoParaLeadEncontrado(btn));
+    });
+  } catch (e) {
+    console.error("Erro ao buscar lead:", e);
+    container.innerHTML = `<p class="busca-status erro">Não consegui buscar agora — tente de novo.</p>`;
+  }
+}
+
+function leadBuscaParaHtml(lead) {
+  const temTelefone = Boolean(lead.telefone);
+  return `
+    <div class="lead-card lead-card-busca" data-lead-busca-id="${lead.id}">
+      <div class="lead-info">
+        <span class="badge-etapa">${escapeHtml(lead.etapa || "Sem etapa")}</span>
+        <span class="lead-nome">${escapeHtml(lead.name)}</span>
+        <span class="lead-meta">${temTelefone ? escapeHtml(lead.telefone) : "Sem telefone no Kommo"}${lead.ja_reaquecido ? " · já tem tag de reaquecido" : ""}</span>
+      </div>
+      <div class="lead-acao lead-acao-busca">
+        <select class="select-video-busca" data-lead-id="${lead.id}" data-telefone="${escapeHtml(lead.telefone || "")}" data-nome="${escapeHtml(lead.name)}">
+          <option value="">Carregando vídeos…</option>
+        </select>
+        <button class="btn-enviar ${temTelefone ? "" : "sem-telefone"}" data-enviar-busca data-lead-id="${lead.id}" ${temTelefone ? "" : "disabled"}>
+          ${iconeWhats()} Enviar
+        </button>
+      </div>
+    </div>`;
+}
+
+let VIDEOS_CONFIG_CACHE = null;
+async function getVideosConfigCache() {
+  if (VIDEOS_CONFIG_CACHE) return VIDEOS_CONFIG_CACHE;
+  const resp = await fetch(`${API_URL}/api/videos-config`);
+  VIDEOS_CONFIG_CACHE = await resp.json();
+  return VIDEOS_CONFIG_CACHE;
+}
+
+async function preencherSelectsDeVideoDaBusca() {
+  const videos = await getVideosConfigCache();
+  document.querySelectorAll(".select-video-busca").forEach(select => {
+    select.innerHTML = videos
+      .map(v => `<option value='${encodeURIComponent(JSON.stringify(v))}'>${escapeHtml(v.etapa_alvo)} — ${escapeHtml(v.titulo)}</option>`)
+      .join("");
+  });
+}
+
+async function enviarVideoParaLeadEncontrado(btn) {
+  const leadId = btn.dataset.leadId;
+  const card = btn.closest(".lead-card-busca");
+  const select = card.querySelector(".select-video-busca");
+  const video = select?.value ? JSON.parse(decodeURIComponent(select.value)) : null;
+  const telefone = select?.dataset.telefone || "";
+  const nome = select?.dataset.nome || "";
+
+  if (!video) {
+    mostrarToast("Escolha um vídeo pra enviar", "erro");
+    return;
+  }
+  if (!telefone) {
+    mostrarToast("Esse lead não tem telefone no Kommo", "erro");
+    return;
+  }
+
+  const primeiroNome = (nome || "").split(" ")[0];
+  const mensagem = `${video.mensagem.replace("[NOME]", primeiroNome)}\n\n${video.link}`;
+  abrirWhatsApp(telefone.replace(/\D/g, ""), mensagem);
+  mostrarToast(`WhatsApp aberto para ${primeiroNome}`, "ok");
+}
+
+const inputBuscaLead = document.getElementById("buscaLeadGlobal");
+let timeoutBuscaLead = null;
+inputBuscaLead?.addEventListener("input", e => {
+  clearTimeout(timeoutBuscaLead);
+  const termo = e.target.value.trim();
+  timeoutBuscaLead = setTimeout(async () => {
+    await buscarLeadGlobal(termo);
+    if (termo) await preencherSelectsDeVideoDaBusca();
+  }, 450);
 });
