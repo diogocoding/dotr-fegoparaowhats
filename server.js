@@ -18,7 +18,7 @@ const HEADERS = { Authorization: `Bearer ${process.env.KOMMO_TOKEN}` };
 const TAG_CONTROLE = "REAQUECIDO_V1"; // Tag que impede o lead de aparecer de novo
 
 // Rota para buscar os leads prontos para reaquecer
-app.get("/api/leads-reaquecer", async (req, res) => {
+app.get("/api/leads-para-reaquecer", async (req, res) => {
     try {
         const videosConfig = JSON.parse(fs.readFileSync("./config/videos.json", "utf-8"));
         const etapasAlvo = videosConfig.map(v => v.etapa_alvo);
