@@ -291,9 +291,17 @@ function escapeHtml(str) {
 // instalado. O link wa.me é o link universal do próprio WhatsApp: o sistema
 // operacional/navegador tenta abrir o app instalado (desktop) primeiro e só
 // cai pro WhatsApp Web se não achar nenhum app.
+// Sempre usa a MESMA aba nomeada em vez de "_blank" (que abre uma aba nova a
+// cada clique). O wa.me já tenta abrir o WhatsApp Desktop instalado primeiro;
+// isso aqui só evita que, quando cai no fallback web, cada envio gere uma
+// nova aba do WhatsApp Web brigando com a anterior (é esse conflito de duas
+// sessões que fazia a mensagem não continuar). Só a primeira mensagem depois
+// desta atualização abre uma aba nova — as próximas reaproveitam essa mesma.
+const NOME_ABA_WHATSAPP = "sdrReheatWhatsApp";
+
 function abrirWhatsApp(telefoneLimpo, mensagem) {
   const url = `https://wa.me/${telefoneLimpo}?text=${encodeURIComponent(mensagem)}`;
-  window.open(url, "_blank");
+  window.open(url, NOME_ABA_WHATSAPP);
 }
 
 el.busca()?.addEventListener("input", e => {
