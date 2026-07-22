@@ -311,7 +311,13 @@ app.get("/v/:key", (req, res) => {
     const imgHeight = vertical ? 1280 : 720;
 
     const embedUrl = `https://drive.google.com/file/d/${video.driveFileId}/preview`;
-    const pageUrl = `${PUBLIC_BASE_URL}/v/${video.key}`;
+    // IMPORTANTE: usa a URL exatamente como foi pedida (com qualquer query
+    // string, ex. ?v=2), em vez de sempre montar o link "limpo". Se og:url
+    // sempre apontar pro link sem parâmetro, o WhatsApp pode tratar esse link
+    // limpo como a "identidade oficial" da página pra fins de cache — e aí
+    // nenhum truque de "?v=2" na hora de mandar furaria o cache, porque a
+    // própria página diria pro WhatsApp "minha URL oficial é a de sempre".
+    const pageUrl = `${PUBLIC_BASE_URL}${req.originalUrl}`;
     const titulo = escapeHtml(video.titulo || "Vídeo - Robson Menezes Advogados");
     const aspectRatio = vertical ? "9/16" : "16/9";
     // Trava a largura do player quando o vídeo é vertical, senão ele estica
