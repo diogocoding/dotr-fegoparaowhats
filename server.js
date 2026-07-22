@@ -22,6 +22,20 @@ const TAG_CONTROLE = process.env.TAG_CONTROLE || "REAQUECIDO_V1";
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "https://dotr-fegoparaowhats.onrender.com").replace(/\/$/, "");
 const DIAS_MINIMOS_PARADO = Number(process.env.DIAS_MINIMOS_PARADO || 2);
 
+// Teto sugerido de envios manuais por dia (reduz risco de o WhatsApp marcar o
+// número como spam se a equipe disparar tudo de uma vez). Não bloqueia nada,
+// só orienta a interface — pode ser ajustado pelo Render sem mexer no código.
+const LIMITE_DIARIO_ENVIOS = Number(process.env.LIMITE_DIARIO_ENVIOS || 25);
+
+// Brasil não tem mais horário de verão desde 2019, então UTC-3 é fixo — dá
+// pra calcular "início do dia local" sem depender de biblioteca de timezone.
+function inicioDoDiaBrasil() {
+    const agora = new Date();
+    const agoraBR = new Date(agora.getTime() - 3 * 60 * 60 * 1000);
+    const inicioBRemUTC = Date.UTC(agoraBR.getUTCFullYear(), agoraBR.getUTCMonth(), agoraBR.getUTCDate(), 3, 0, 0);
+    return Math.floor(inicioBRemUTC / 1000);
+}
+
 // ---------------------------------------------------------------------------
 // Config de vídeos (config/videos.json)
 // ---------------------------------------------------------------------------
@@ -217,6 +231,31 @@ app.get("/api/leads-para-reaquecer", async (req, res) => {
         res.json(reaqueciveis);
     } catch (error) {
         console.error("Erro em /api/leads-para-reaquecer:", error.response?.data || error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ---------------------------------------------------------------------------
+// Plano do dia: quantos leads já foram marcados como reaquecidos hoje, contando
+// no Kommo (não no navegador) — assim o número é o mesmo pra qualquer pessoa
+// da equipe, em qualquer computador, porque a fonte é a tag aplicada no lead,
+// não um contador local. Custo: se alguém editar o lead de novo depois de
+// marcá-lo hoje, ele continua contando (updated_at não distingue o motivo do
+// toque) — na prática isso é raro no mesmo dia.
+// ---------------------------------------------------------------------------
+app.get("/api/plano-do-dia", async (req, res) => {
+    try {
+        const leads = await buscarTodosOsLeads();
+        const inicioHoje = inicioDoDiaBrasil();
+
+        const enviadosHoje = leads.filter(l => {
+            const temTag = l._embedded?.tags?.some(t => t.name === TAG_CONTROLE);
+            return temTag && l.updated_at >= inicioHoje;
+        }).length;
+
+        res.json({ enviados_hoje: enviadosHoje, limite: LIMITE_DIARIO_ENVIOS });
+    } catch (error) {
+        console.error("Erro em /api/plano-do-dia:", error.response?.data || error.message);
         res.status(500).json({ error: error.message });
     }
 });
