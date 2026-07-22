@@ -291,10 +291,32 @@ app.get("/v/:key", (req, res) => {
         return res.status(404).send("Vídeo não encontrado.");
     }
 
-    const thumbUrl = `https://drive.google.com/thumbnail?id=${video.driveFileId}&sz=w1280-h720`;
+    // A maioria dos vídeos desta lista é gravada no celular (formato vertical,
+    // 9:16). Por padrão tratamos como vertical — quem quiser um vídeo
+    // horizontal (16:9) precisa marcar "vertical": false naquela entrada do
+    // videos.json.
+    const vertical = video.vertical !== false;
+
+    // Pedimos ao Drive uma caixa NO FORMATO CERTO (retrato ou paisagem) em vez
+    // de sempre pedir uma caixa paisagem (w1280-h720). Isso evita depender de
+    // como cada visualizador (app do celular vs. o crawler server-side que o
+    // WhatsApp Web/Desktop usa) interpreta a rotação do vídeo — cada um pode
+    // decidir de forma diferente quando a caixa pedida não bate com a
+    // orientação real, o que é a causa mais provável do vídeo aparecer
+    // vertical num lugar e horizontal no outro.
+    const thumbUrl = vertical
+        ? `https://drive.google.com/thumbnail?id=${video.driveFileId}&sz=w720-h1280`
+        : `https://drive.google.com/thumbnail?id=${video.driveFileId}&sz=w1280-h720`;
+    const imgWidth = vertical ? 720 : 1280;
+    const imgHeight = vertical ? 1280 : 720;
+
     const embedUrl = `https://drive.google.com/file/d/${video.driveFileId}/preview`;
     const pageUrl = `${PUBLIC_BASE_URL}/v/${video.key}`;
     const titulo = escapeHtml(video.titulo || "Vídeo - Robson Menezes Advogados");
+    const aspectRatio = vertical ? "9/16" : "16/9";
+    // Trava a largura do player quando o vídeo é vertical, senão ele estica
+    // até 640px de largura e fica gigante/estranho num card fino.
+    const maxWidthPlayer = vertical ? "360px" : "640px";
 
     res.send(`<!DOCTYPE html>
 <html lang="pt-BR">
@@ -306,15 +328,17 @@ app.get("/v/:key", (req, res) => {
 <meta property="og:title" content="${titulo}">
 <meta property="og:description" content="Robson Menezes Advogados — assista ao vídeo completo.">
 <meta property="og:image" content="${thumbUrl}">
+<meta property="og:image:width" content="${imgWidth}">
+<meta property="og:image:height" content="${imgHeight}">
 <meta property="og:url" content="${pageUrl}">
 <meta name="twitter:card" content="summary_large_image">
 <style>
   :root{color-scheme:dark;}
   *{box-sizing:border-box;}
   body{margin:0;background:#0b0f14;color:#e8ecef;font-family:'Inter',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
-  .card{width:100%;max-width:640px;}
+  .card{width:100%;max-width:${maxWidthPlayer};}
   h1{font-family:'Space Grotesk',system-ui,sans-serif;font-size:1.1rem;font-weight:600;margin:0 0 14px;color:#f2f4f6;}
-  .player{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:#000;box-shadow:0 20px 60px -20px rgba(245,166,35,0.25);}
+  .player{position:relative;width:100%;aspect-ratio:${aspectRatio};border-radius:16px;overflow:hidden;background:#000;box-shadow:0 20px 60px -20px rgba(245,166,35,0.25);}
   iframe{width:100%;height:100%;border:0;}
   .brand{margin-top:18px;font-size:0.75rem;letter-spacing:0.04em;text-transform:uppercase;color:#8a97a6;}
   .brand b{color:#f5a623;}
