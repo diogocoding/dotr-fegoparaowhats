@@ -8,6 +8,63 @@ let TERMO_BUSCA = "";
 let IDS_JA_VISTOS = null; // null = ainda não fez a primeira carga
 const INTERVALO_VERIFICACAO_MS = 3 * 60 * 1000; // confere novos leads a cada 3 min
 
+// ---------------------------------------------------------------------------
+// Plano do dia — teto de envios manuais por dia, pra reduzir o risco de o
+// WhatsApp marcar o número como spam se o SDR disparar tudo de uma vez.
+// Não bloqueia o envio (continua manual e sob controle de quem está usando),
+// só reordena visualmente o que é prioridade hoje vs. o que pode esperar
+// amanhã, e mostra quantos já foram mandados. Contagem fica só no navegador
+// (reseta sozinha à meia-noite, por data local).
+// ---------------------------------------------------------------------------
+const LIMITE_DIARIO = 25;
+
+function chaveEnviosHoje() {
+  const hoje = new Date().toISOString().slice(0, 10);
+  return `sdr_reheat_enviados_${hoje}`;
+}
+
+function getEnviadosHoje() {
+  return Number(localStorage.getItem(chaveEnviosHoje()) || 0);
+}
+
+function incrementarEnviadosHoje() {
+  const atual = getEnviadosHoje() + 1;
+  try {
+    localStorage.setItem(chaveEnviosHoje(), String(atual));
+  } catch (e) {
+    console.warn("Não consegui salvar o contador do plano do dia:", e);
+  }
+  return atual;
+}
+
+// Dá pra cada lead (na ordem em que já chegam do backend, mais parado primeiro)
+// um status "hoje" ou "amanha" com base no que já foi enviado hoje.
+function calcularStatusPlanoDia() {
+  const enviadosHoje = getEnviadosHoje();
+  const restante = Math.max(0, LIMITE_DIARIO - enviadosHoje);
+  const mapa = new Map();
+  TODOS_OS_LEADS.forEach((lead, idx) => {
+    mapa.set(String(lead.id), idx < restante ? "hoje" : "amanha");
+  });
+  return { mapa, enviadosHoje };
+}
+
+// Termômetro do caso: quanto mais dias parado, mais "frio" (mais segmentos
+// preenchidos, cor migra de âmbar pra cinza-azulado).
+function calcularTermometro(dias) {
+  if (dias <= 3) return { nivel: 1, cor: "var(--temp-quente)" };
+  if (dias <= 7) return { nivel: 2, cor: "var(--temp-quente)" };
+  if (dias <= 14) return { nivel: 3, cor: "var(--temp-morno)" };
+  if (dias <= 30) return { nivel: 4, cor: "var(--temp-frio)" };
+  return { nivel: 5, cor: "var(--temp-gelado)" };
+}
+
+function termometroHtml(dias) {
+  const { nivel, cor } = calcularTermometro(dias);
+  const segmentos = Array.from({ length: 5 }, (_, i) => `<span class="${i < nivel ? "on" : ""}"></span>`).join("");
+  return `<span class="termometro" style="--seg-cor:${cor}" title="${dias} dia${dias === 1 ? "" : "s"} parado">${segmentos}</span>`;
+}
+
 const el = {
   lista: () => document.getElementById("listaLeads"),
   stats: () => document.getElementById("stats"),
@@ -70,10 +127,18 @@ function renderizarStats() {
   const total = TODOS_OS_LEADS.length;
   const porEtapa = agruparPorEtapa(TODOS_OS_LEADS);
   const etapasOrdenadas = [...porEtapa.entries()].sort((a, b) => b[1] - a[1]);
+  const enviadosHoje = getEnviadosHoje();
+  const noLimite = enviadosHoje >= LIMITE_DIARIO;
+  const pctBarra = Math.min(100, Math.round((enviadosHoje / LIMITE_DIARIO) * 100));
 
   const cards = [
     `<div class="stat destaque"><div class="valor">${total}</div><div class="rotulo">Pendentes de reaquecer</div></div>`,
-    ...etapasOrdenadas.slice(0, 3).map(
+    `<div class="stat plano-dia ${noLimite ? "no-limite" : ""}" title="Teto sugerido pra reduzir risco de bloqueio no WhatsApp">
+      <div class="valor">${enviadosHoje}/${LIMITE_DIARIO}</div>
+      <div class="rotulo">Enviados hoje</div>
+      <div class="barra"><div class="barra-fill" style="width:${pctBarra}%"></div></div>
+    </div>`,
+    ...etapasOrdenadas.slice(0, 2).map(
       ([etapa, qtd]) => `<div class="stat"><div class="valor">${qtd}</div><div class="rotulo">${escapeHtml(etapa)}</div></div>`
     ),
   ];
@@ -132,7 +197,18 @@ function renderizarLista() {
     return;
   }
 
-  container.innerHTML = leads.map(leadParaHtml).join("");
+  const { mapa: mapaPlano } = calcularStatusPlanoDia();
+  let divisorInserido = false;
+  const partes = [];
+  leads.forEach(lead => {
+    const status = mapaPlano.get(String(lead.id)) || "hoje";
+    if (status === "amanha" && !divisorInserido) {
+      partes.push(`<div class="divisor-plano">sugestão pra amanhã</div>`);
+      divisorInserido = true;
+    }
+    partes.push(leadParaHtml(lead, status));
+  });
+  container.innerHTML = partes.join("");
 
   container.querySelectorAll("[data-enviar]").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -143,17 +219,20 @@ function renderizarLista() {
   });
 }
 
-function leadParaHtml(lead) {
+function leadParaHtml(lead, statusPlano = "hoje") {
   const video = lead.video_sugerido || { titulo: "Vídeo institucional", link: "#", copy: "Olá!" };
   const temTelefone = Boolean(lead.telefone);
   const videoData = encodeURIComponent(JSON.stringify(video));
 
   return `
-    <div class="lead-card">
+    <div class="lead-card ${statusPlano === "amanha" ? "amanha" : ""}">
       <div class="lead-info">
         <span class="badge-etapa">${escapeHtml(lead.etapa || "—")}</span>
         <span class="lead-nome">${escapeHtml(lead.name)}</span>
-        <span class="lead-meta">Parado há ${lead.dias_parado} dia${lead.dias_parado === 1 ? "" : "s"}${temTelefone ? "" : " · sem telefone no Kommo"}</span>
+        <span class="lead-meta">
+          ${termometroHtml(lead.dias_parado)}
+          Parado há ${lead.dias_parado} dia${lead.dias_parado === 1 ? "" : "s"}${temTelefone ? "" : " · sem telefone no Kommo"}
+        </span>
       </div>
       <div class="lead-acao">
         <div class="sugestao">
@@ -190,6 +269,7 @@ async function enviarWhatsApp(leadId, nome, telefone, videoConfig, btn) {
   try {
     const resp = await fetch(`${API_URL}/api/marcar-enviado/${leadId}`, { method: "POST" });
     if (!resp.ok) throw new Error(`status ${resp.status}`);
+    incrementarEnviadosHoje();
     mostrarToast(`${nome.split(" ")[0]} marcado como reaquecido`, "ok");
     TODOS_OS_LEADS = TODOS_OS_LEADS.filter(l => String(l.id) !== String(leadId));
     renderizarStats();
@@ -425,6 +505,8 @@ async function enviarVideoParaLeadEncontrado(btn) {
   const primeiroNome = (nome || "").split(" ")[0];
   const mensagem = `${video.mensagem.replace("[NOME]", primeiroNome)}\n\n${video.link}`;
   abrirWhatsApp(telefone.replace(/\D/g, ""), mensagem);
+  incrementarEnviadosHoje();
+  renderizarStats();
   mostrarToast(`WhatsApp aberto para ${primeiroNome}`, "ok");
 }
 
