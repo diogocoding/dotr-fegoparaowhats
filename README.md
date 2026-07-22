@@ -123,6 +123,17 @@ versão web. O `wa.me` é o link universal do próprio WhatsApp: o sistema
 tenta abrir o WhatsApp Desktop instalado primeiro, e só cai pra versão web
 se não achar nenhum app instalado.
 
+Quando cai no fallback web, o clique sempre reaproveita a **mesma aba**
+(`window.open` com um nome fixo em vez de `"_blank"`), em vez de abrir uma
+aba nova a cada envio. Isso evita o conflito clássico do WhatsApp Web: duas
+abas logadas na mesma conta ao mesmo tempo fazem ele perguntar qual das duas
+"vence", e a aba vencedora carrega do zero — foi isso que fazia a mensagem
+não dar continuidade antes. Só a primeira mensagem enviada depois de abrir o
+painel abre uma aba nova; as seguintes reaproveitam essa mesma aba. Se você
+já tinha uma aba do WhatsApp Web aberta manualmente antes de usar o painel,
+essa aba antiga não é reaproveitada — só as abertas pelo próprio painel a
+partir daí.
+
 ## Envio de teste (pra você mesmo, sem tocar no Kommo)
 
 O painel tem uma seção "Envio de teste" (embaixo da lista de leads) onde dá
