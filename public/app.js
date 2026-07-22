@@ -10,43 +10,40 @@ const INTERVALO_VERIFICACAO_MS = 3 * 60 * 1000; // confere novos leads a cada 3 
 
 // ---------------------------------------------------------------------------
 // Plano do dia — teto de envios manuais por dia, pra reduzir o risco de o
-// WhatsApp marcar o número como spam se o SDR disparar tudo de uma vez.
-// Não bloqueia o envio (continua manual e sob controle de quem está usando),
-// só reordena visualmente o que é prioridade hoje vs. o que pode esperar
-// amanhã, e mostra quantos já foram mandados. Contagem fica só no navegador
-// (reseta sozinha à meia-noite, por data local).
+// WhatsApp marcar o número como spam se a equipe disparar tudo de uma vez.
+// Não bloqueia o envio (continua manual), só reordena visualmente o que é
+// prioridade hoje vs. o que pode esperar amanhã, e mostra quantos já foram
+// mandados. O número vem do backend (contagem real de tags aplicadas no
+// Kommo hoje) — é o mesmo pra qualquer pessoa da equipe, em qualquer
+// computador, porque não depende de nada guardado no navegador.
 // ---------------------------------------------------------------------------
-const LIMITE_DIARIO = 25;
+let PLANO_DIA = { enviados_hoje: 0, limite: 25 };
 
-function chaveEnviosHoje() {
-  const hoje = new Date().toISOString().slice(0, 10);
-  return `sdr_reheat_enviados_${hoje}`;
-}
-
-function getEnviadosHoje() {
-  return Number(localStorage.getItem(chaveEnviosHoje()) || 0);
-}
-
-function incrementarEnviadosHoje() {
-  const atual = getEnviadosHoje() + 1;
+async function atualizarPlanoDia() {
   try {
-    localStorage.setItem(chaveEnviosHoje(), String(atual));
+    const resp = await fetch(`${API_URL}/api/plano-do-dia`);
+    if (!resp.ok) throw new Error(`status ${resp.status}`);
+    PLANO_DIA = await resp.json();
   } catch (e) {
-    console.warn("Não consegui salvar o contador do plano do dia:", e);
+    console.warn("Não consegui atualizar o plano do dia:", e);
   }
-  return atual;
+}
+
+// Incremento otimista pra dar feedback instantâneo no clique — o número real
+// é reconciliado no próximo carregamento (poll de 3 min ou "Atualizar").
+function marcarEnvioOtimista() {
+  PLANO_DIA = { ...PLANO_DIA, enviados_hoje: PLANO_DIA.enviados_hoje + 1 };
 }
 
 // Dá pra cada lead (na ordem em que já chegam do backend, mais parado primeiro)
 // um status "hoje" ou "amanha" com base no que já foi enviado hoje.
 function calcularStatusPlanoDia() {
-  const enviadosHoje = getEnviadosHoje();
-  const restante = Math.max(0, LIMITE_DIARIO - enviadosHoje);
+  const restante = Math.max(0, PLANO_DIA.limite - PLANO_DIA.enviados_hoje);
   const mapa = new Map();
   TODOS_OS_LEADS.forEach((lead, idx) => {
     mapa.set(String(lead.id), idx < restante ? "hoje" : "amanha");
   });
-  return { mapa, enviadosHoje };
+  return mapa;
 }
 
 // Termômetro do caso: quanto mais dias parado, mais "frio" (mais segmentos
@@ -93,7 +90,10 @@ async function carregarLeadsParaReaquecer({ manterFiltro = true, silencioso = fa
   }
 
   try {
-    const response = await fetch(`${API_URL}/api/leads-para-reaquecer`);
+    const [response] = await Promise.all([
+      fetch(`${API_URL}/api/leads-para-reaquecer`),
+      atualizarPlanoDia(),
+    ]);
     if (!response.ok) throw new Error(`Erro no servidor: ${response.status}`);
 
     TODOS_OS_LEADS = await response.json();
@@ -127,15 +127,15 @@ function renderizarStats() {
   const total = TODOS_OS_LEADS.length;
   const porEtapa = agruparPorEtapa(TODOS_OS_LEADS);
   const etapasOrdenadas = [...porEtapa.entries()].sort((a, b) => b[1] - a[1]);
-  const enviadosHoje = getEnviadosHoje();
-  const noLimite = enviadosHoje >= LIMITE_DIARIO;
-  const pctBarra = Math.min(100, Math.round((enviadosHoje / LIMITE_DIARIO) * 100));
+  const { enviados_hoje: enviadosHoje, limite } = PLANO_DIA;
+  const noLimite = enviadosHoje >= limite;
+  const pctBarra = Math.min(100, Math.round((enviadosHoje / limite) * 100));
 
   const cards = [
     `<div class="stat destaque"><div class="valor">${total}</div><div class="rotulo">Pendentes de reaquecer</div></div>`,
-    `<div class="stat plano-dia ${noLimite ? "no-limite" : ""}" title="Teto sugerido pra reduzir risco de bloqueio no WhatsApp">
-      <div class="valor">${enviadosHoje}/${LIMITE_DIARIO}</div>
-      <div class="rotulo">Enviados hoje</div>
+    `<div class="stat plano-dia ${noLimite ? "no-limite" : ""}" title="Teto sugerido pra reduzir risco de bloqueio no WhatsApp — contado a partir das tags aplicadas no Kommo hoje, vale pra equipe toda">
+      <div class="valor">${enviadosHoje}/${limite}</div>
+      <div class="rotulo">Enviados hoje (equipe)</div>
       <div class="barra"><div class="barra-fill" style="width:${pctBarra}%"></div></div>
     </div>`,
     ...etapasOrdenadas.slice(0, 2).map(
@@ -197,7 +197,7 @@ function renderizarLista() {
     return;
   }
 
-  const { mapa: mapaPlano } = calcularStatusPlanoDia();
+  const mapaPlano = calcularStatusPlanoDia();
   let divisorInserido = false;
   const partes = [];
   leads.forEach(lead => {
@@ -269,7 +269,7 @@ async function enviarWhatsApp(leadId, nome, telefone, videoConfig, btn) {
   try {
     const resp = await fetch(`${API_URL}/api/marcar-enviado/${leadId}`, { method: "POST" });
     if (!resp.ok) throw new Error(`status ${resp.status}`);
-    incrementarEnviadosHoje();
+    marcarEnvioOtimista();
     mostrarToast(`${nome.split(" ")[0]} marcado como reaquecido`, "ok");
     TODOS_OS_LEADS = TODOS_OS_LEADS.filter(l => String(l.id) !== String(leadId));
     renderizarStats();
@@ -505,9 +505,22 @@ async function enviarVideoParaLeadEncontrado(btn) {
   const primeiroNome = (nome || "").split(" ")[0];
   const mensagem = `${video.mensagem.replace("[NOME]", primeiroNome)}\n\n${video.link}`;
   abrirWhatsApp(telefone.replace(/\D/g, ""), mensagem);
-  incrementarEnviadosHoje();
-  renderizarStats();
-  mostrarToast(`WhatsApp aberto para ${primeiroNome}`, "ok");
+
+  btn.disabled = true;
+  btn.textContent = "Marcando…";
+
+  try {
+    const resp = await fetch(`${API_URL}/api/marcar-enviado/${leadId}`, { method: "POST" });
+    if (!resp.ok) throw new Error(`status ${resp.status}`);
+    marcarEnvioOtimista();
+    renderizarStats();
+    mostrarToast(`WhatsApp aberto para ${primeiroNome} — marcado como reaquecido no Kommo`, "ok");
+  } catch (e) {
+    console.error("Erro ao marcar como enviado (busca livre):", e);
+    mostrarToast("Mensagem aberta, mas não consegui marcar no Kommo — tente de novo", "erro");
+    btn.disabled = false;
+    btn.innerHTML = `${iconeWhats()} Enviar`;
+  }
 }
 
 const inputBuscaLead = document.getElementById("buscaLeadGlobal");
