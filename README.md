@@ -1,4 +1,3 @@
-
 # SDR Reheat — Robson Menezes Advogados
 
 Painel interno para reaquecer leads que esfriaram em etapas críticas do Kommo
@@ -78,7 +77,43 @@ telefone digitado, **independente da etapa ou de quantos dias está parado**.
 É por isso que o seu próprio número (ou um lead muito novo) não aparecia na
 busca do topo antes: aquela busca só filtra dentro da lista já pré-filtrada
 de candidatos a reaquecimento. Na busca nova dá pra escolher qualquer vídeo
-configurado e mandar no WhatsApp na hora, pra qualquer lead encontrado.
+configurado e mandar no WhatsApp na hora, pra qualquer lead encontrado —
+e esse envio **aplica a tag de reaquecido no Kommo**, igual ao fluxo
+principal, pra esse lead não ser sugerido de novo depois e pra entrar na
+contagem do "Plano do dia" (ver seção abaixo). Diferente do "Envio de teste",
+que continua sem tocar em nada no Kommo.
+
+## Plano do dia (teto de envios diários)
+
+A lista de candidatos a reaquecer não tem limite — se houver 80 leads
+parados, os 80 aparecem de uma vez, e nada impede o SDR de sair clicando
+"Enviar" em todos em sequência. Isso é um risco real: enviar muitas
+mensagens manuais seguidas pelo WhatsApp pessoal pode fazer o número ser
+sinalizado como spam.
+
+Pra reduzir esse risco sem virar automação nem exigir agendamento por
+calendário, o painel mostra:
+- Um contador **"Enviados hoje (equipe)"** no topo, tipo `12/25`, com barra
+  de progresso.
+- Os leads continuam ordenados do mais parado pro mais recente (como já
+  era), mas a partir do 26º da fila (ajustável) aparece uma linha divisória
+  "sugestão pra amanhã" e esses cards ficam com opacidade reduzida — não
+  bloqueia o envio, só orienta.
+
+Importante: esse contador **não é guardado no navegador**. Ele é calculado
+pelo backend (`GET /api/plano-do-dia`) contando quantos leads já receberam a
+tag de controle (`REAQUECIDO_V1`) hoje, direto no Kommo. Por isso o número é
+o mesmo pra qualquer pessoa da equipe, em qualquer computador — se fosse
+guardado no navegador (`localStorage`), cada máquina teria sua própria
+contagem e o número nunca representaria o total real de mensagens saindo.
+
+O teto padrão é 25/dia e pode ser mudado sem alterar código, só ajustando a
+variável de ambiente `LIMITE_DIARIO_ENVIOS` no Render.
+
+Limitação conhecida: a contagem usa `updated_at` do lead pra saber se a tag
+foi aplicada *hoje*. Se alguém editar esse mesmo lead de novo mais tarde no
+mesmo dia (por outro motivo, fora do painel), ele continua contando — na
+prática isso é raro acontecer no mesmo dia em que o lead foi reaquecido.
 
 ## Links do WhatsApp abrindo o app instalado
 
@@ -110,6 +145,11 @@ rodando).
 
 ## Variáveis de ambiente
 
+Além das já existentes (`KOMMO_SUBDOMAIN`, `KOMMO_TOKEN`, `PUBLIC_BASE_URL`,
+`DIAS_MINIMOS_PARADO`, `TAG_CONTROLE`), tem agora:
+
+- `LIMITE_DIARIO_ENVIOS` — teto sugerido de envios por dia mostrado no painel
+  ("Plano do dia"). Padrão: `25`. Não bloqueia envio, só orienta a interface.
 
 Veja `.env.example`. As mesmas variáveis devem ser configuradas no painel do
 Render (Environment).
