@@ -2,6 +2,17 @@
 // sem barra "/" no final.
 const API_URL = "https://dotr-fegoparaowhats.onrender.com";
 
+// Registra o service worker (PWA) — deixa o painel instalável como app,
+// mas os dados de leads continuam sempre vindo direto do backend (ver
+// comentário no service-worker.js sobre o que é/não é cacheado).
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("service-worker.js").catch(err => {
+      console.warn("Não consegui registrar o service worker:", err);
+    });
+  });
+}
+
 let TODOS_OS_LEADS = [];
 let ETAPA_ATIVA = "TODAS";
 let TERMO_BUSCA = "";
