@@ -27,6 +27,24 @@ const DIAS_MINIMOS_PARADO = Number(process.env.DIAS_MINIMOS_PARADO || 2);
 // só orienta a interface — pode ser ajustado pelo Render sem mexer no código.
 const LIMITE_DIARIO_ENVIOS = Number(process.env.LIMITE_DIARIO_ENVIOS || 25);
 
+// ---------------------------------------------------------------------------
+// Contador de reaquecimentos por lead (OPCIONAL). A tag (TAG_CONTROLE) só diz
+// "já foi reaquecido alguma vez ou não" — não diz quantas vezes. Pra saber
+// quantas vezes e quando foi a última, usamos dois campos personalizados do
+// próprio Kommo (criados manualmente uma vez pelo admin da conta — veja o
+// README). Se essas duas variáveis não estiverem configuradas, esse recurso
+// fica desligado sozinho e o resto do sistema funciona normal.
+const CAMPO_CONTADOR_ID = process.env.KOMMO_CAMPO_CONTADOR_ID ? Number(process.env.KOMMO_CAMPO_CONTADOR_ID) : null;
+const CAMPO_ULTIMA_DATA_ID = process.env.KOMMO_CAMPO_ULTIMA_DATA_ID ? Number(process.env.KOMMO_CAMPO_ULTIMA_DATA_ID) : null;
+
+// Lê o valor de um campo personalizado de um lead já carregado (o próprio
+// GET /leads já traz custom_fields_values por padrão, sem precisar de "with").
+function extrairValorCampo(lead, fieldId) {
+    if (!fieldId) return null;
+    const campo = (lead.custom_fields_values || []).find(f => f.field_id === fieldId);
+    return campo?.values?.[0]?.value ?? null;
+}
+
 // Brasil não tem mais horário de verão desde 2019, então UTC-3 é fixo — dá
 // pra calcular "início do dia local" sem depender de biblioteca de timezone.
 function inicioDoDiaBrasil() {
@@ -215,6 +233,12 @@ app.get("/api/leads-para-reaquecer", async (req, res) => {
                 etapa: nomeEtapa,
                 dias_parado: diasParado,
                 telefone: telefone || null,
+                // Quantas vezes esse lead já recebeu um reaquecimento e quando foi
+                // a última — só vem preenchido se os campos personalizados
+                // estiverem configurados (ver KOMMO_CAMPO_CONTADOR_ID/
+                // KOMMO_CAMPO_ULTIMA_DATA_ID no .env). Sem isso, ambos vêm null.
+                vezes_reaquecido: CAMPO_CONTADOR_ID ? Number(extrairValorCampo(l, CAMPO_CONTADOR_ID) || 0) : null,
+                ultima_vez_reaquecido: CAMPO_ULTIMA_DATA_ID ? extrairValorCampo(l, CAMPO_ULTIMA_DATA_ID) : null,
                 video_sugerido: {
                     titulo: video.titulo,
                     // Link enviado é a NOSSA página de prévia (/v/:key), não o link seco
@@ -265,11 +289,28 @@ app.get("/api/plano-do-dia", async (req, res) => {
 // ---------------------------------------------------------------------------
 app.post("/api/marcar-enviado/:id", async (req, res) => {
     try {
-        await axios.patch(
-            `${KOMMO_URL}/leads/${req.params.id}`,
-            { _embedded: { tags: [{ name: TAG_CONTROLE }] } },
-            { headers: HEADERS }
-        );
+        const leadId = req.params.id;
+        const body = { tags_to_add: [{ name: TAG_CONTROLE }] };
+
+        // Só entra em ação se os dois campos personalizados estiverem
+        // configurados no .env — busca o valor atual do contador pra
+        // incrementar (em vez de sempre gravar "1"), então esse lead vai
+        // acumulando 1, 2, 3... reaquecimentos ao longo do tempo.
+        if (CAMPO_CONTADOR_ID || CAMPO_ULTIMA_DATA_ID) {
+            const respLead = await axios.get(`${KOMMO_URL}/leads/${leadId}`, { headers: HEADERS });
+            const customFieldsValues = [];
+
+            if (CAMPO_CONTADOR_ID) {
+                const valorAtual = Number(extrairValorCampo(respLead.data, CAMPO_CONTADOR_ID) || 0);
+                customFieldsValues.push({ field_id: CAMPO_CONTADOR_ID, values: [{ value: valorAtual + 1 }] });
+            }
+            if (CAMPO_ULTIMA_DATA_ID) {
+                customFieldsValues.push({ field_id: CAMPO_ULTIMA_DATA_ID, values: [{ value: Math.floor(Date.now() / 1000) }] });
+            }
+            body.custom_fields_values = customFieldsValues;
+        }
+
+        await axios.patch(`${KOMMO_URL}/leads/${leadId}`, body, { headers: HEADERS });
         res.json({ success: true });
     } catch (error) {
         console.error("Erro em /api/marcar-enviado:", error.response?.data || error.message);
@@ -395,6 +436,8 @@ app.get("/api/buscar-lead", async (req, res) => {
                 etapa: mapaEtapas.get(String(l.status_id)) || null,
                 telefone: telefone || null,
                 ja_reaquecido: l._embedded?.tags?.some(t => t.name === TAG_CONTROLE) || false,
+                vezes_reaquecido: CAMPO_CONTADOR_ID ? Number(extrairValorCampo(l, CAMPO_CONTADOR_ID) || 0) : null,
+                ultima_vez_reaquecido: CAMPO_ULTIMA_DATA_ID ? extrairValorCampo(l, CAMPO_ULTIMA_DATA_ID) : null,
             };
         });
 
