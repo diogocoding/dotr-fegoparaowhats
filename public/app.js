@@ -243,6 +243,7 @@ function leadParaHtml(lead, statusPlano = "hoje") {
         <span class="lead-meta">
           ${termometroHtml(lead.dias_parado)}
           Parado há ${lead.dias_parado} dia${lead.dias_parado === 1 ? "" : "s"}${temTelefone ? "" : " · sem telefone no Kommo"}
+          ${reaquecimentosMetaHtml(lead)}
         </span>
       </div>
       <div class="lead-acao">
@@ -262,6 +263,18 @@ function leadParaHtml(lead, statusPlano = "hoje") {
         </button>
       </div>
     </div>`;
+}
+
+// Mostra "🔁 2x · última há 5 dias" quando o backend tem os campos
+// personalizados configurados (KOMMO_CAMPO_CONTADOR_ID / KOMMO_CAMPO_ULTIMA_DATA_ID).
+// Se não tiver (vezes_reaquecido null), não mostra nada — recurso opcional.
+function reaquecimentosMetaHtml(lead) {
+  if (lead.vezes_reaquecido == null || lead.vezes_reaquecido <= 0) return "";
+  const diasDesde = lead.ultima_vez_reaquecido
+    ? Math.floor((Date.now() / 1000 - lead.ultima_vez_reaquecido) / 86400)
+    : null;
+  const parteData = diasDesde != null ? ` · última há ${diasDesde} dia${diasDesde === 1 ? "" : "s"}` : "";
+  return `· 🔁 ${lead.vezes_reaquecido}x${parteData}`;
 }
 
 function iconeWhats() {
@@ -474,7 +487,7 @@ function leadBuscaParaHtml(lead) {
       <div class="lead-info">
         <span class="badge-etapa">${escapeHtml(lead.etapa || "Sem etapa")}</span>
         <span class="lead-nome">${escapeHtml(lead.name)}</span>
-        <span class="lead-meta">${temTelefone ? escapeHtml(lead.telefone) : "Sem telefone no Kommo"}${lead.ja_reaquecido ? " · já tem tag de reaquecido" : ""}</span>
+        <span class="lead-meta">${temTelefone ? escapeHtml(lead.telefone) : "Sem telefone no Kommo"}${lead.ja_reaquecido ? " · já tem tag de reaquecido" : ""} ${reaquecimentosMetaHtml(lead)}</span>
       </div>
       <div class="lead-acao lead-acao-busca">
         <select class="select-video-busca" data-lead-id="${lead.id}" data-telefone="${escapeHtml(lead.telefone || "")}" data-nome="${escapeHtml(lead.name)}">
