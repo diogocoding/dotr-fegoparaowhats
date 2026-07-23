@@ -165,6 +165,42 @@ Além das já existentes (`KOMMO_SUBDOMAIN`, `KOMMO_TOKEN`, `PUBLIC_BASE_URL`,
 Veja `.env.example`. As mesmas variáveis devem ser configuradas no painel do
 Render (Environment).
 
+## Contador de reaquecimentos por lead (opcional)
+
+A tag de controle (`REAQUECIDO_V1`) só diz **se** um lead já foi reaquecido
+alguma vez — não diz **quantas vezes** nem **quando foi a última**. Isso
+importa principalmente no fluxo de "Buscar qualquer lead no Kommo", que pode
+mandar pro mesmo lead mais de uma vez sem restrição de dias parado.
+
+Pra ativar o contador, é preciso criar dois campos personalizados de **Negócio
+(Lead)** no Kommo (Configurações → Campos personalizados → Negócio):
+
+1. Um campo numérico, ex: `Qtd. de reaquecimentos`.
+2. Um campo do tipo Data, ex: `Último reaquecimento`.
+
+Depois de criados, pegue o `field_id` de cada um (aparece na URL ao editar o
+campo, ou via `GET /api/v4/leads/custom_fields` na API do Kommo) e configure
+no Render:
+
+- `KOMMO_CAMPO_CONTADOR_ID` — field_id do campo numérico.
+- `KOMMO_CAMPO_ULTIMA_DATA_ID` — field_id do campo de data.
+
+Se essas duas variáveis não forem configuradas, o recurso simplesmente não
+aparece — o resto do sistema continua funcionando normal.
+
+Com isso configurado, cada vez que um lead é marcado como reaquecido
+(principal ou busca livre), o contador soma +1 e a data é atualizada — e o
+painel passa a mostrar, no card do lead, algo como `🔁 2x · última há 5 dias`.
+
+### Por que "tags_to_add" e não "_embedded.tags"
+
+Ao aplicar a tag de controle, o backend usa o campo `tags_to_add` da API da
+Kommo, e não `_embedded.tags`. Isso é importante: um PATCH usando
+`_embedded.tags` **substitui a lista inteira de tags do lead**, apagando
+qualquer outra tag que ele já tivesse (origem, campanha, etc.). `tags_to_add`
+é o campo que a própria Kommo disponibiliza especificamente para adicionar
+uma tag sem mexer nas demais.
+
 ## Rodando localmente
 
 ```bash
