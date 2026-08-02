@@ -1,236 +1,547 @@
 # SDR Reheat — Robson Menezes Advogados
 
-Painel interno para reaquecer leads que esfriaram em etapas críticas do Kommo
-(Contato Iniciado, No Show, Protocolo Farmer), sugerindo o vídeo certo para
-cada etapa e disparando o WhatsApp com um clique.
+Painel interno para apoiar SDRs no reaquecimento de leads do Kommo através de mensagens personalizadas no WhatsApp, utilizando vídeos específicos para cada etapa do funil.
 
-## Arquitetura
+O sistema identifica automaticamente quais leads estão parados há tempo suficiente, sugere o vídeo correto e gera a mensagem pronta para envio no WhatsApp com apenas um clique.
 
-- **Backend** (`server.js`): Node/Express hospedado no Render. Fala com a API
-  do Kommo, decide quem é candidato a reaquecimento e aplica a tag de
-  controle depois do envio.
-- **Frontend** (`public/`): HTML/CSS/JS puro hospedado no Cloudflare Pages.
-- **Sem banco de dados próprio**: o "estado" de quem já foi reaquecido vive
-  como tag no próprio Kommo (`REAQUECIDO_V1` por padrão).
+---
 
-## O problema do link "seco" do Drive (e como foi resolvido)
+# Índice
 
-Link do Google Drive colado direto no WhatsApp não gera prévia (thumbnail).
-Vimeo não tem mais plano gratuito, e subir tudo pro YouTube não é viável
-agora. A solução deste projeto: **cada vídeo tem sua própria página de
-prévia**, servida pelo próprio backend em `/v/:key`.
+- Visão geral
+- Principais funcionalidades
+- Arquitetura
+- Fluxo de funcionamento
+- Pré-requisitos
+- Instalação
+- Configuração
+- Variáveis de ambiente
+- Configuração dos vídeos
+- Página de prévia dos vídeos
+- Plano do dia
+- Busca livre de leads
+- Envio de teste
+- Contador de reaquecimentos
+- Deploy
+- Estrutura do projeto
+- Funcionamento interno
+- Limitações
+- Roadmap
 
-Essa página:
-1. Tem as tags Open Graph corretas (`og:image` apontando para a miniatura
-   pública do Drive, `og:title`, etc.) — é isso que o WhatsApp lê para montar
-   a prévia com thumbnail no chat.
-2. Ao ser aberta, mostra o vídeo direto embedado (player do Drive), sem exigir
-   login nem redirecionar para fora.
+---
 
-Ou seja: **o vídeo continua no Google Drive**, só que o link enviado no
-WhatsApp não é mais o link cru do Drive — é `SEU_BACKEND/v/chave-do-video`.
+# Visão geral
 
-### Pré-requisito no Drive
-O arquivo precisa estar compartilhado como **"Qualquer pessoa com o link" →
-Leitor**. Sem isso, nem a miniatura nem o player funcionam.
+O projeto foi desenvolvido para resolver alguns problemas comuns do processo de reaquecimento de leads:
 
-## Configurando os vídeos (`config/videos.json`)
+- identificar automaticamente quem está parado há vários dias;
+- sugerir o vídeo correto conforme a etapa do funil;
+- impedir que o mesmo lead seja sugerido repetidamente;
+- manter todo o controle dentro do próprio Kommo, sem banco de dados próprio;
+- permitir envio totalmente manual pelo WhatsApp, evitando automações proibidas.
 
-```json
-{
-  "key": "ad1-protecao-caixa",       // identificador único, usado na URL /v/:key
-  "etapa_alvo": "CONTATO INICIADO",  // precisa bater com o NOME da etapa no Kommo
-  "titulo": "Autoridade: Proteção de Caixa",
-  "driveFileId": "cole aqui o link completo do Drive ou só o ID",
-  "mensagem": "Texto com [NOME] como placeholder do primeiro nome do lead"
-}
+---
+
+# Principais funcionalidades
+
+- Busca automática de leads elegíveis para reaquecimento.
+- Identificação dinâmica das etapas do pipeline.
+- Distribuição automática entre vários vídeos da mesma etapa.
+- Geração automática da mensagem personalizada.
+- Placeholder `[NOME]`.
+- Busca livre de qualquer lead do Kommo.
+- Envio de teste para qualquer número.
+- Página própria de prévia dos vídeos.
+- Plano diário de envios.
+- Contador opcional de reaquecimentos.
+- Notificações quando surgirem novos leads.
+- Interface totalmente web.
+
+---
+
+# Arquitetura
+
+```
+Cloudflare Pages
+        │
+        │
+Frontend (HTML/CSS/JS)
+        │
+        ▼
+Express (Render)
+        │
+        ├── API Kommo
+        │
+        └── Google Drive
 ```
 
-Pode colar a URL inteira do Drive (`https://drive.google.com/file/d/ID/view?usp=sharing`)
-em `driveFileId` — o backend extrai o ID sozinho.
+Não existe banco de dados.
 
-`etapa_alvo` é comparado (sem diferenciar maiúsculas/acentos de espaço) com o
-nome real da etapa que o sistema busca dinamicamente na API do Kommo
-(`/leads/pipelines`), então não precisa descobrir e colar IDs de status na mão.
+Todo o estado do sistema fica armazenado no próprio Kommo através de:
 
-Uma etapa pode ter **vários vídeos** (basta repetir o mesmo `etapa_alvo` em
-mais de uma entrada) — o sistema escolhe um de forma determinística por lead,
-distribuindo entre eles.
+- tags;
+- campos personalizados (opcionalmente).
 
-### Limite de dias diferente por etapa
-Por padrão todas as etapas usam `DIAS_MINIMOS_PARADO` (variável de ambiente).
-Se alguma etapa precisar de um número diferente, adicione `"dias_minimos": N`
-em qualquer vídeo daquela etapa:
+---
 
-```json
-{
-  "key": "...", "etapa_alvo": "EM QUALIFICACAO", "dias_minimos": 3, ...
-}
-```
+# Fluxo de funcionamento
 
-## Buscar qualquer lead no Kommo
+1. O backend consulta o Kommo.
+2. Obtém os pipelines.
+3. Descobre os nomes das etapas.
+4. Busca todos os leads.
+5. Calcula quantos dias estão parados.
+6. Ignora quem já possui a tag de controle.
+7. Seleciona o vídeo correspondente.
+8. Exibe o card na interface.
+9. O SDR revisa.
+10. Clica em "Enviar no WhatsApp".
+11. O WhatsApp abre com a mensagem pronta.
+12. O backend aplica a tag de controle.
+13. Opcionalmente incrementa o contador de reaquecimentos.
 
-Abaixo da lista principal tem uma busca ("Buscar qualquer lead no Kommo") que
-não usa o filtro de "pronto pra reaquecer" — ela chama a API do Kommo direto
-(`GET /leads?query=...`) e devolve qualquer lead que bater com o nome ou
-telefone digitado, **independente da etapa ou de quantos dias está parado**.
-É por isso que o seu próprio número (ou um lead muito novo) não aparecia na
-busca do topo antes: aquela busca só filtra dentro da lista já pré-filtrada
-de candidatos a reaquecimento. Na busca nova dá pra escolher qualquer vídeo
-configurado e mandar no WhatsApp na hora, pra qualquer lead encontrado —
-e esse envio **aplica a tag de reaquecido no Kommo**, igual ao fluxo
-principal, pra esse lead não ser sugerido de novo depois e pra entrar na
-contagem do "Plano do dia" (ver seção abaixo). Diferente do "Envio de teste",
-que continua sem tocar em nada no Kommo.
+---
 
-## Plano do dia (teto de envios diários)
+# Pré-requisitos
 
-A lista de candidatos a reaquecer não tem limite — se houver 80 leads
-parados, os 80 aparecem de uma vez, e nada impede o SDR de sair clicando
-"Enviar" em todos em sequência. Isso é um risco real: enviar muitas
-mensagens manuais seguidas pelo WhatsApp pessoal pode fazer o número ser
-sinalizado como spam.
+- Node.js 18+
+- Conta Kommo
+- Token da API do Kommo
+- Vídeos armazenados no Google Drive
+- Projeto hospedado no Render
+- Frontend hospedado no Cloudflare Pages
 
-Pra reduzir esse risco sem virar automação nem exigir agendamento por
-calendário, o painel mostra:
-- Um contador **"Enviados hoje (equipe)"** no topo, tipo `12/25`, com barra
-  de progresso.
-- Os leads continuam ordenados do mais parado pro mais recente (como já
-  era), mas a partir do 26º da fila (ajustável) aparece uma linha divisória
-  "sugestão pra amanhã" e esses cards ficam com opacidade reduzida — não
-  bloqueia o envio, só orienta.
+---
 
-Importante: esse contador **não é guardado no navegador**. Ele é calculado
-pelo backend (`GET /api/plano-do-dia`) contando quantos leads já receberam a
-tag de controle (`REAQUECIDO_V1`) hoje, direto no Kommo. Por isso o número é
-o mesmo pra qualquer pessoa da equipe, em qualquer computador — se fosse
-guardado no navegador (`localStorage`), cada máquina teria sua própria
-contagem e o número nunca representaria o total real de mensagens saindo.
-
-O teto padrão é 25/dia e pode ser mudado sem alterar código, só ajustando a
-variável de ambiente `LIMITE_DIARIO_ENVIOS` no Render.
-
-Limitação conhecida: a contagem usa `updated_at` do lead pra saber se a tag
-foi aplicada *hoje*. Se alguém editar esse mesmo lead de novo mais tarde no
-mesmo dia (por outro motivo, fora do painel), ele continua contando — na
-prática isso é raro acontecer no mesmo dia em que o lead foi reaquecido.
-
-## Links do WhatsApp abrindo o app instalado
-
-Os links de envio agora usam `https://wa.me/<numero>?text=...` em vez de
-`https://web.whatsapp.com/send?...`. O `web.whatsapp.com` força sempre a
-versão web. O `wa.me` é o link universal do próprio WhatsApp: o sistema
-tenta abrir o WhatsApp Desktop instalado primeiro, e só cai pra versão web
-se não achar nenhum app instalado.
-
-Quando cai no fallback web, o clique sempre reaproveita a **mesma aba**
-(`window.open` com um nome fixo em vez de `"_blank"`), em vez de abrir uma
-aba nova a cada envio. Isso evita o conflito clássico do WhatsApp Web: duas
-abas logadas na mesma conta ao mesmo tempo fazem ele perguntar qual das duas
-"vence", e a aba vencedora carrega do zero — foi isso que fazia a mensagem
-não dar continuidade antes. Só a primeira mensagem enviada depois de abrir o
-painel abre uma aba nova; as seguintes reaproveitam essa mesma aba. Se você
-já tinha uma aba do WhatsApp Web aberta manualmente antes de usar o painel,
-essa aba antiga não é reaproveitada — só as abertas pelo próprio painel a
-partir daí.
-
-## Envio de teste (pra você mesmo, sem tocar no Kommo)
-
-O painel tem uma seção "Envio de teste" (embaixo da lista de leads) onde dá
-pra colocar um nome e um número qualquer (o seu, por exemplo), escolher um
-dos vídeos configurados e mandar a mensagem no WhatsApp — sem aplicar tag
-nem mexer em nada no Kommo.
-
-## Envio automático
-
-O painel confere sozinho a cada 3 minutos se apareceu lead novo pronto pra
-reaquecer e avisa (toast na tela + notificação do navegador, se você clicar
-em "Avisos" e permitir). O envio em si continua manual — você sempre revisa
-e clica em "Enviar no WhatsApp" antes de qualquer mensagem sair. Isso evita
-os riscos de automação total (bloqueio do número pela política do WhatsApp,
-ou precisar de WhatsApp Business API oficial).
-
-A notificação do navegador só chega enquanto a aba estiver aberta (pode
-ficar minimizada, mas o computador precisa estar ligado com o navegador
-rodando).
-
-## Variáveis de ambiente
-
-Além das já existentes (`KOMMO_SUBDOMAIN`, `KOMMO_TOKEN`, `PUBLIC_BASE_URL`,
-`DIAS_MINIMOS_PARADO`, `TAG_CONTROLE`), tem agora:
-
-- `LIMITE_DIARIO_ENVIOS` — teto sugerido de envios por dia mostrado no painel
-  ("Plano do dia"). Padrão: `25`. Não bloqueia envio, só orienta a interface.
-
-Veja `.env.example`. As mesmas variáveis devem ser configuradas no painel do
-Render (Environment).
-
-## Contador de reaquecimentos por lead (opcional)
-
-A tag de controle (`REAQUECIDO_V1`) só diz **se** um lead já foi reaquecido
-alguma vez — não diz **quantas vezes** nem **quando foi a última**. Isso
-importa principalmente no fluxo de "Buscar qualquer lead no Kommo", que pode
-mandar pro mesmo lead mais de uma vez sem restrição de dias parado.
-
-Pra ativar o contador, é preciso criar dois campos personalizados de **Negócio
-(Lead)** no Kommo (Configurações → Campos personalizados → Negócio):
-
-1. Um campo numérico, ex: `Qtd. de reaquecimentos`.
-2. Um campo do tipo Data, ex: `Último reaquecimento`.
-
-Depois de criados, pegue o `field_id` de cada um (aparece na URL ao editar o
-campo, ou via `GET /api/v4/leads/custom_fields` na API do Kommo) e configure
-no Render:
-
-- `KOMMO_CAMPO_CONTADOR_ID` — field_id do campo numérico.
-- `KOMMO_CAMPO_ULTIMA_DATA_ID` — field_id do campo de data.
-
-Se essas duas variáveis não forem configuradas, o recurso simplesmente não
-aparece — o resto do sistema continua funcionando normal.
-
-Com isso configurado, cada vez que um lead é marcado como reaquecido
-(principal ou busca livre), o contador soma +1 e a data é atualizada — e o
-painel passa a mostrar, no card do lead, algo como `🔁 2x · última há 5 dias`.
-
-### Por que "tags_to_add" e não "_embedded.tags"
-
-Ao aplicar a tag de controle, o backend usa o campo `tags_to_add` da API da
-Kommo, e não `_embedded.tags`. Isso é importante: um PATCH usando
-`_embedded.tags` **substitui a lista inteira de tags do lead**, apagando
-qualquer outra tag que ele já tivesse (origem, campanha, etc.). `tags_to_add`
-é o campo que a própria Kommo disponibiliza especificamente para adicionar
-uma tag sem mexer nas demais.
-
-## Rodando localmente
+# Instalação
 
 ```bash
 npm install
-cp .env.example .env   # preencha com os valores reais
+```
+
+Crie o arquivo:
+
+```bash
+cp .env.example .env
+```
+
+Configure as variáveis.
+
+Execute:
+
+```bash
 npm start
 ```
 
-## Deploy
+---
 
-- **Render**: nada muda no processo atual — só garanta que as variáveis de
-  ambiente novas (`PUBLIC_BASE_URL`, `DIAS_MINIMOS_PARADO`, `TAG_CONTROLE`)
-  estejam configuradas lá também.
-- **Cloudflare Pages**: publique a pasta `public/` como antes. Se o domínio do
-  Render mudar, atualize `API_URL` no topo de `public/app.js`.
+# Variáveis de ambiente
 
-## O que mudou nesta reestruturação
+## Obrigatórias
 
-- Removido script duplicado dentro de `index.html` que brigava com `app.js` e
-  chamava um endpoint (`/api/leads-reaquecer`) que não existe.
-- Corrigido o bug em que **todo** lead recebia o vídeo de "Contato Iniciado",
-  independente da etapa real (`server.js` não convertia `status_id` em nome
-  de etapa antes de comparar).
-- Adicionada paginação real na busca de leads (antes travava em 250).
-- Telefone do lead agora é buscado de verdade nos contatos do Kommo — antes o
-  campo simplesmente não existia na resposta.
-- Mapeamento de etapas passou a ser buscado dinamicamente da API do Kommo, em
-  vez de depender de IDs fixos copiados manualmente.
-- Resolvido o problema da prévia do vídeo no WhatsApp (ver seção acima),
-  sem depender de Vimeo pago ou upload no YouTube.
-- Interface redesenhada: cards com hierarquia mais clara, filtro por etapa,
-  busca por nome, contador de pendentes por etapa, estados de carregamento/
-  vazio/erro tratados, feedback de toast ao marcar um lead como enviado.
+```env
+KOMMO_SUBDOMAIN=
+
+KOMMO_TOKEN=
+
+PUBLIC_BASE_URL=
+
+TAG_CONTROLE=REAQUECIDO_V1
+
+DIAS_MINIMOS_PARADO=2
+
+LIMITE_DIARIO_ENVIOS=25
+```
+
+## Opcionais
+
+```env
+KOMMO_CAMPO_CONTADOR_ID=
+
+KOMMO_CAMPO_ULTIMA_DATA_ID=
+```
+
+### Descrição
+
+### KOMMO_SUBDOMAIN
+
+Subdomínio da conta Kommo.
+
+---
+
+### KOMMO_TOKEN
+
+Token da API.
+
+---
+
+### PUBLIC_BASE_URL
+
+URL pública do backend.
+
+Exemplo:
+
+```
+https://meu-backend.onrender.com
+```
+
+---
+
+### TAG_CONTROLE
+
+Tag aplicada após o envio.
+
+Padrão:
+
+```
+REAQUECIDO_V1
+```
+
+---
+
+### DIAS_MINIMOS_PARADO
+
+Quantidade mínima de dias parado para entrar na fila.
+
+---
+
+### LIMITE_DIARIO_ENVIOS
+
+Quantidade sugerida de envios por dia.
+
+Não bloqueia o envio.
+
+Serve apenas como orientação visual.
+
+---
+
+### KOMMO_CAMPO_CONTADOR_ID
+
+Campo numérico do Kommo.
+
+Opcional.
+
+---
+
+### KOMMO_CAMPO_ULTIMA_DATA_ID
+
+Campo de data do Kommo.
+
+Opcional.
+
+---
+
+# Configuração dos vídeos
+
+Arquivo:
+
+```
+config/videos.json
+```
+
+Cada vídeo possui:
+
+```json
+{
+    "key":"protecao-caixa",
+
+    "titulo":"Proteção de Caixa",
+
+    "etapa_alvo":"CONTATO INICIADO",
+
+    "driveFileId":"https://drive.google.com/file/d/...",
+
+    "mensagem":"Olá [NOME]..."
+}
+```
+
+Pode ser informado:
+
+- apenas o ID do arquivo;
+- ou o link completo do Google Drive.
+
+O backend extrai automaticamente o ID.
+
+---
+
+## Dias mínimos por etapa
+
+Também é possível definir um tempo específico:
+
+```json
+{
+    "dias_minimos":4
+}
+```
+
+Nesse caso a etapa ignora o valor global.
+
+---
+
+## Vários vídeos para a mesma etapa
+
+É permitido possuir diversos vídeos para uma mesma etapa.
+
+O sistema faz uma distribuição determinística entre eles.
+
+---
+
+# Página de prévia dos vídeos
+
+Enviar diretamente um link do Google Drive normalmente não gera thumbnail no WhatsApp.
+
+Para resolver isso, cada vídeo possui uma página própria:
+
+```
+/v/chave-do-video
+```
+
+Essa página contém:
+
+- Open Graph
+- thumbnail
+- título
+- descrição
+- player incorporado
+
+Assim o WhatsApp gera corretamente a prévia da conversa.
+
+---
+
+# Google Drive
+
+Os vídeos precisam estar compartilhados como:
+
+```
+Qualquer pessoa com o link
+Leitor
+```
+
+Caso contrário:
+
+- o player não abre;
+- a thumbnail não aparece.
+
+---
+
+# Busca livre de leads
+
+Além da lista automática existe uma busca direta no Kommo.
+
+Ela permite localizar qualquer lead:
+
+- independente da etapa;
+- independente dos dias parado;
+- mesmo que não esteja elegível para reaquecimento.
+
+Após enviar:
+
+- aplica a tag;
+- atualiza o contador;
+- entra no plano do dia.
+
+---
+
+# Envio de teste
+
+Existe uma área destinada apenas para testes.
+
+Ela permite:
+
+- informar qualquer nome;
+- qualquer telefone;
+- qualquer vídeo.
+
+Nenhuma informação é enviada ao Kommo.
+
+Nenhuma tag é aplicada.
+
+Nenhum contador é atualizado.
+
+Serve apenas para validar mensagens.
+
+---
+
+# Plano do dia
+
+O painel possui um limite sugerido de envios.
+
+Exemplo:
+
+```
+12 / 25
+```
+
+Esse valor é calculado diretamente no Kommo.
+
+Não utiliza:
+
+- Local Storage
+- Cookies
+- Banco de dados
+
+O backend conta quantos leads receberam a tag de controle no dia atual.
+
+Após atingir o limite:
+
+- os próximos cards continuam aparecendo;
+- ficam apenas destacados como sugestão para o próximo dia.
+
+O envio continua permitido.
+
+---
+
+# Contador de reaquecimentos
+
+Opcional.
+
+Permite saber:
+
+- quantas vezes um lead foi reaquecido;
+- quando ocorreu o último envio.
+
+Necessário criar dois campos personalizados no Kommo:
+
+Campo Numérico
+
+```
+Qtd. de reaquecimentos
+```
+
+Campo Data
+
+```
+Último reaquecimento
+```
+
+Depois configurar seus IDs nas variáveis de ambiente.
+
+Quando ativos, o sistema atualiza automaticamente esses campos.
+
+---
+
+# Notificações
+
+A interface consulta novos leads periodicamente.
+
+Quando surgem novos candidatos:
+
+- toast na tela;
+- notificação do navegador (caso autorizada).
+
+Nenhuma mensagem é enviada automaticamente.
+
+Todo envio continua sendo manual.
+
+---
+
+# WhatsApp
+
+O projeto utiliza:
+
+```
+https://wa.me/
+```
+
+Isso permite abrir:
+
+- WhatsApp Desktop;
+- WhatsApp Mobile;
+- WhatsApp Web.
+
+Quando utiliza o navegador, a mesma aba é reutilizada para evitar conflitos entre múltiplas sessões.
+
+---
+
+# Estrutura do projeto
+
+```
+.
+├── config/
+│   └── videos.json
+│
+├── public/
+│   ├── index.html
+│   ├── app.js
+│   ├── styles.css
+│   └── assets/
+│
+├── server.js
+├── package.json
+└── README.md
+```
+
+---
+
+# Deploy
+
+## Backend
+
+Hospedar no Render.
+
+Configurar todas as variáveis de ambiente.
+
+---
+
+## Frontend
+
+Publicar a pasta:
+
+```
+public/
+```
+
+no Cloudflare Pages.
+
+Caso a URL do backend seja alterada, atualizar a constante da API no frontend.
+
+---
+
+# Funcionamento interno
+
+O backend:
+
+- consulta pipelines;
+- obtém nomes das etapas;
+- busca leads paginados;
+- busca telefones dos contatos;
+- identifica elegíveis;
+- seleciona vídeos;
+- monta mensagens;
+- aplica tags;
+- atualiza campos personalizados;
+- calcula o plano do dia.
+
+Todo o estado permanece armazenado exclusivamente no Kommo.
+
+---
+
+# Limitações
+
+- O envio continua manual.
+- Depende da disponibilidade da API do Kommo.
+- Os vídeos precisam estar públicos no Google Drive.
+- A contagem diária utiliza o `updated_at` do lead.
+- Não existe histórico próprio além das informações armazenadas no Kommo.
+
+---
+
+# Roadmap
+
+Possíveis melhorias futuras:
+
+- filtros avançados;
+- dashboard de métricas;
+- relatórios por SDR;
+- histórico completo de envios;
+- suporte a múltiplos pipelines;
+- múltiplas empresas;
+- exportação de relatórios;
+- agendamento de campanhas;
+- integração com WhatsApp Business API.
+
+---
+
+# Licença
+
+Projeto interno desenvolvido para uso da equipe do Robson Menezes Advogados.
